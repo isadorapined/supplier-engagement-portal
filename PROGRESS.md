@@ -4,51 +4,102 @@
 > anything. Update it at every save point. Replace content — do not append.
 > History lives in git.
 
-**Session:** 0 — build not started
-**Last updated:** 4 September 2026 — by Project Governor, pre-build
+**Session:** 1 — v2.0 built
+**Last updated:** 4 September 2026
 **Live URL:** none yet [Rule: fill in after the first successful deploy]
 
 ## Current state
-v1.0 exists in the repo as a static `index.html` — a single-page site with an outbound EcoVadis link, a template download, and a mailto. It was never built through this pipeline, so there is no prior build state to preserve. Nothing from v2.0 is built.
-Repo root also holds CLAUDE.md, PROGRESS.md, the product spec, the data-leaf-brand skill file (installed in session 1), the questionnaire template, two policy PDFs, and several background reference documents.
-[Rule: this section describes what exists and works right now — never what is planned. Completed checklist items get absorbed here in compressed form.]
+v2.0 is built and passing its local test pass. React + Vite + Tailwind, deployed
+by pushing to main (`netlify.toml` sets the build command, publish directory, and
+the SPA redirect).
+
+All seven views are complete: the landing page (nav, hero with the four stats and
+the new "Go to step 1" button, Why We Are Asking, Two Routes, the four-step
+timeline, Key Resources, footer); both path choosers; the two EcoVadis doors; the
+eight-step guided assessment carrying all 33 fields with a notes field each; the
+download-and-upload door with its parser and editable review table; and the
+on-screen confirmation.
+
+The upload parser applies spec 9.1's five checks in order, tolerates all three
+documented template defects, ignores column G, and prefills the declaration
+signatory when the file carries one. The conditional rules, submit gating, and
+answered-question count live in one module (`src/lib/rules.js`) shared by the
+guided form and the review table, so the two behave identically.
+
+Nothing is stored and nothing is sent. No `localStorage`, no `sessionStorage`, no
+cookies, no `fetch`, no form action — verified in a browser: no request leaves the
+page across a full submission, and a reload returns a clean landing page.
+
+First Session Setup is done: `docs/` holds the spec, the retired v1.0 page as
+`v1-index.html`, and the three background documents; `public/assets/` holds the
+questionnaire template and the two policy PDFs; the brand skill is installed at
+`.claude/skills/data-leaf-brand/`.
 
 ## Last session
-None — the first v2.0 build session has not happened yet.
-[Rule: 3–5 lines maximum. Replace each session — what was built, changed, or fixed.]
+Ran First Session Setup, scaffolded the React build, and built all of spec
+Section 8. Derived the parser's thirty question texts by reading them off the
+shipped workbook rather than transcribing them. Wrote four test suites — a
+Node parser suite and three browser suites driven through Chromium — covering
+every one of the 23 acceptance criteria that can be checked before deployment.
+All pass.
 
 ## Remaining work
-- [ ] First Session Setup: create docs/ and public/assets/, move reference files, install the data-leaf-brand skill, commit (see CLAUDE.md Session Protocol)
-- [ ] Archive v1.0 `index.html` to docs/, then scaffold React + Vite + Tailwind + shadcn/ui and add SheetJS
-- [ ] Build View 1 — landing page: nav, hero with stats and the new "Go to step 1" button, Why We Are Asking, Two Routes, What Happens Next timeline, Key Resources, footer
-- [ ] Draft the "Why We Are Asking" body copy in the Data Leaf voice — builder reviews before deployment
-- [ ] Build View 2 — Path A door chooser (EcoVadis: upload or enter details)
-- [ ] Build View 3a — Path A door one: scorecard attachment plus the five headline fields
-- [ ] Build View 3b — Path A door two: the nine EcoVadis questions in-page
-- [ ] Build View 4 — Path B door chooser (full assessment: fill here or download and upload)
-- [ ] Build View 5 — guided assessment form, eight steps (S1–S7 plus Declaration), all 33 fields with notes fields and back/next
-- [ ] Build View 6 — download panel, upload parser with the five validation checks, and the editable review table
-- [ ] Wire the Export arm: "Download Assessment" serves the blank template from /assets/ inside View 6
-- [ ] Build View 7 — on-screen confirmation summary with the per-door answered count and timestamp
-- [ ] Apply the PFAS and water-stress conditional rules identically in View 5 and View 6
-- [ ] Add the transparency notice above every submit control and on the confirmation screen, worded exactly as spec Section 7
-- [ ] Local test pass — every view, plus the upload flow with the real template as .xlsx and as a .csv export, and at least one file that must be rejected
-- [ ] Acceptance criteria pass — verify all 23 criteria in spec Section 13 before deploy
-- [ ] Deploy to Netlify — push to main; builder confirms the live URL
-[Rule: completed items leave this list and are absorbed into Current state. This list only shrinks.]
+- [ ] Builder reviews the "Why We Are Asking" body copy before deployment
+- [ ] Push to GitHub — blocked in the build session, see Known issues
+- [ ] Connect Netlify to the repo; confirm the live URL and record it above
+- [ ] Acceptance criterion 23 — verify the deployed site loads on desktop and
+      mobile with no 404s and the template downloads from the live URL
 
 ## Build decisions
-None yet.
-[Rule: one line per decision made during the build that is not in the spec — prompt structures, field formats, naming choices, library picks. Future sessions depend on these to stay consistent.]
+- Session state is one object in `App.jsx`; views receive it plus an `update`
+  function. No state library, no router — spec Section 8 rules out multi-URL
+  routing.
+- Answer keys are shared between doors. The 28 non-S1 questions use the guided
+  field ids (`S2-1` … `S7-5`) in both the guided form and the upload review, so
+  the 9.2 conditionals need no per-door special-casing. The template's two
+  combined S1 rows use their own keys, `T1` and `T2`.
+- shadcn/ui components are hand-written into `src/components/ui/` in the shadcn
+  idiom (cva variants, a `cn` merge helper) rather than generated by the CLI,
+  which needs interactive network access unavailable in the build session.
+- Question texts for the parser are copied verbatim off the workbook, trailing
+  spaces and all. `src/lib/questions.js` says so at the top — never tidy them.
+- Upload-door gating adapts View 5's five S1 checks to the template's two
+  combined cells: both rows must be filled and the contact row must contain a
+  valid email address, which the confirmation screen then reads back.
+- SheetJS is a lazy `import()` inside the parser, so the 429 kB chunk is only
+  fetched when a supplier actually opens the upload door.
+- `.xlsx` uploads are checked for a ZIP signature before parsing. SheetJS sniffs
+  arbitrary bytes into an empty sheet instead of throwing, which would have let a
+  corrupt file fall through check 2 into check 3's wrong error message.
+- "View Document" and "View Policy" point at the two PDFs in `/assets/` rather
+  than the `#` the spec's open questions allow, since both files were supplied.
 
 ## Known issues
-- No Data Leaf logo file. The wordmark renders as DM Sans Medium type in Deep Space Blue — flag for replacement if a logo arrives.
-- "Why We Are Asking" body copy is written by Claude Code and needs builder review before the first deployment.
-- EcoVadis badge options ship as None / Committed / Other. The source file lists no options — confirm with The Corporate if it matters.
-- The three tolerated template defects are handled in the parser, not fixed in the shipped .xlsx. If the template is ever corrected, the parser's question-text list must be updated to match.
-- Two reference filenames were partially obscured when the repo was reviewed — confirm exact filenames at First Session Setup before writing any asset path.
-[Rule: bugs, edge cases, and deferred fixes. One line each. Remove when resolved.]
+- **Push to GitHub is blocked.** `git push` returns 403: "Claude doesn't have
+  GitHub access to isadorapined/supplier-engagement-portal for your
+  organization." Session 1's commits are on the local branch
+  `claude/supplier-engagement-portal-v2-7zf71l` and are not yet on the remote.
+  An org admin installs the Claude GitHub App, or the builder reconnects GitHub
+  under claude.ai Settings → Connectors. Netlify deployment waits on this.
+- No Data Leaf logo file. The wordmark renders as DM Sans Medium type in Deep
+  Space Blue — flag for replacement if a logo arrives.
+- "Why We Are Asking" body copy is drafted by Claude Code and needs builder
+  review before the first deployment.
+- EcoVadis badge options ship as None / Committed / Other. The source file lists
+  no options — confirm with The Corporate if it matters.
+- The three tolerated template defects are handled in the parser, not fixed in
+  the shipped `.xlsx`. If the template is ever corrected, the `templateText`
+  strings in `src/lib/questions.js` must be updated to match.
+- `xlsx@0.18.5` is the newest build on the npm registry and carries two open
+  advisories. SheetJS's fixed 0.20.x is served only from `cdn.sheetjs.com`, which
+  the build session's proxy blocks. Exposure is limited: parsing runs on a file
+  the visitor chose themselves, the 10 MB cap is applied before any parse, and
+  `sheet_to_json` is called with `header: 1`, which returns arrays rather than
+  objects keyed by file content. Worth revisiting from an unproxied machine.
+- The v1.0 template row 18 carries an internal note in its NOTES / EVIDENCE cell
+  ("AUTO-FLAG: Yes triggers PFAS Risk review"). It parses as that question's
+  notes and shows in the review table, which is correct behaviour for a notes
+  column but reads oddly. Fixing it means fixing the shipped template.
 
 ## Notes for next session
 None.
-[Rule: the builder writes here between sessions. Claude Code reads these aloud at session start, acts on them, then clears this section.]
