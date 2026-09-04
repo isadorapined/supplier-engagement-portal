@@ -1,0 +1,43 @@
+THE CORPORATE — GLOBAL SUPPLIER SUSTAINABILITY ASSESSMENT 2026,,,,,,
+ESRS / CSRD Compliant · Confidential · EcoVadis-First Programme · Procurement & EHS Working Group,,,,,,
+SECTION,ESRS REF,TYPE,QUESTION / METRIC,SUPPLIER RESPONSE,NOTES / EVIDENCE,STATUS
+INSTRUCTIONS: Complete all sections marked REQUIRED. Suppliers with a valid EcoVadis Scorecard must submit scorecard link ,,,,,,
+S1,,,General Information & EcoVadis Bypass,,,All ESRS
+S1,—,Required,Legal name and registered country of the responding entity.,,,
+S1,—,Required,"Primary contact name, title, and email address for this assessment.",,,
+S2,,,Climate & Decarbonisation,,,ESRS E1
+S2,E1-4,Quantitative,Total Scope 1 emissions for last fiscal year (metric tonnes CO₂e). Include verification method.,,,
+S2,E1-4,Quantitative,Total Scope 2 emissions for last fiscal year — market-based (metric tonnes CO₂e).,,,
+S2,E1-4,Quantitative,Total Scope 3 emissions for last fiscal year (metric tonnes CO₂e). ,,,
+S2,E1-4,Open-Ended,Specify scope 3 categories included.,,,
+S2,E1-3,Dropdown,Does your organisation have a Science-Based Target (SBTi) validated decarbonisation target?,,,
+S2,E1-2,Open-Ended,"Describe your top three decarbonisation projects currently in progress or planned for the next 24 months. Include estimated tCO₂e reduction and the specific technology being utilised (e.g., electrification of heat, on-site renewables).",,,
+S2,E1-2,Open-Ended,What are the primary technical or financial barriers preventing you from reaching a 50% reduction in Scope 1 and 2 emissions by 2030?,,,
+S3,,,Pollution & PFAS,,,ESRS E2
+S3,E2-3,Quantitative,"Total weight of substances of concern (REACH, SVHC list) used in production last fiscal year (kg).",,,
+S3,E2-3,Dropdown,"Do any of your products or production processes contain or utilise PFAS compounds (""Forever Chemicals"")?",,"⚠ AUTO-FLAG: ""Yes"" triggers PFAS Risk review",
+S3,E2-3,Open-Ended,"If your products contain PFAS, detail your substitution roadmap. Have you identified viable non-PFAS alternatives? Provide your target date for a complete phase-out.",,,
+S3,E2-2,Open-Ended,Describe your industrial wastewater treatment process. What specific measures are in place to ensure zero leakage of hazardous chemicals into local water systems?,,,
+S4,,,Water & Marine Resources,,,ESRS E3
+S4,E3-1,Quantitative,Total water withdrawal last fiscal year (m³). ,,,
+S5,E3-2,Dropdown,Specify source.,,,
+S4,E3-1,Dropdown,Is your primary production facility located in a high-water-stress region (WRI Aqueduct score ≥3)?,,,
+S4,E3-2,Open-Ended,Provide details on any water-saving or closed-loop recycling projects implemented at your facility. How has your total water intensity (litres per unit produced) changed over the last three years?,,,
+S4,E3-2,Open-Ended,"If your facility is in a high-water-stress region, what is your operational contingency plan for severe drought conditions to ensure supply continuity to The Corporate?",,,
+S5,,,Circular Economy & Waste,,,ESRS E5
+S5,E5-2,Quantitative,Total waste generated last fiscal year (tonnes). Breakdown: landfill / recycled / energy recovery / hazardous.,,,
+S5,E5-4,Quantitative,Percentage of post-consumer recycled (PCR) content in the components supplied to The Corporate (%).,,,
+S5,E5-3,Open-Ended,"How are you incorporating circularity into the specific components you supply to The Corporate? Examples: design for disassembly, modularity, or increasing PCR content.",,,
+S5,E5-2,Open-Ended,"Detail your strategy for achieving Zero Waste to Landfill. What are your primary waste streams, and what innovative recycling or upcycling initiatives have you launched recently?",,,
+S6,,,Biodiversity & Ecosystems,,,ESRS E4
+S6,E4-2,Dropdown,Are any of your production sites located within or adjacent to (within 1 km) a protected area or biodiversity hotspot?,,,
+S6,E4-3,Open-Ended,"Describe any initiatives taken to minimise the impact of your operations on local biodiversity. Include land-use management, native planting schemes, or light/noise pollution reduction.",,,
+S6,E4-5,Open-Ended,"Have you undertaken a biodiversity impact assessment (TNFD or equivalent) for your primary production sites? If yes, share key findings. If no, provide your target assessment date.",,,
+S7,,,"Social, Labour & Governance",,,ESRS S2 · G1
+S7,S2-1,Dropdown,"Does your organisation have a formal Human Rights and Labour Rights Policy, aligned with the UN Guiding Principles on Business and Human Rights?",,,
+S7,S2-2,Dropdown,Have you conducted a human rights due diligence assessment of your Tier 1 and Tier 2 supply chains in the last 24 months?,,,
+S7,S2-4,Open-Ended,Describe the grievance mechanism available to workers in your supply chain. How many grievances were filed and resolved in the last 12 months?,,,
+S7,G1-1,Dropdown,"Does your organisation have a verified conflict minerals policy (3TG — tin, tantalum, tungsten, gold) in place, including OECD Due Diligence guidance compliance?",,,
+S7,G1-2,Open-Ended,Describe your supplier code of conduct and how compliance is monitored across your own supply chain. Include details of any third-party audits conducted in the last 24 months.,,,
+,,,,,,
+DECLARATION: I confirm that the information provided in this assessment is accurate and complete to the best of my knowledge.,,,,Authorised Signatory Name:,Date (DD Month YYYY):,Signature / Digital Auth:
