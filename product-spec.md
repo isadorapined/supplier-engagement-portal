@@ -1,9 +1,11 @@
 # Product Spec — The Corporate Supplier Sustainability Portal 2026
 
-**Version:** 1.0
-**Date:** 12 June 2026
-**Author:** Zyad Hatquai
+**Version:** 2.0
+**Date:** 4 September 2026
+**Author:** Isadora Pineda Stanischeski
 **Status:** Confirmed
+
+> v1.0 of this spec was authored by Zyad Hatquai and documented the original static landing page. This version supersedes it.
 
 ---
 
@@ -11,13 +13,13 @@
 
 **Tool name:** The Corporate Supplier Sustainability Portal 2026
 
-**What it does:** A single-page public landing page that onboards Tier 1 suppliers into The Corporate's ESRS-aligned sustainability assessment programme. It communicates the company's net-zero targets, explains the two submission paths, and routes each supplier to the correct action — EcoVadis scorecard submission or Excel questionnaire download.
+**What it does:** A public single-page portal that onboards Tier 1 suppliers into The Corporate's ESRS-aligned 2026 sustainability assessment and lets them complete and submit that assessment inside the page itself — either by filling guided forms on screen or by uploading the completed official Excel template.
 
 **Who uses it:** Tier 1 supplier contacts — sustainability managers, EHS leads, and procurement representatives at supplier organisations — who receive the URL directly from The Corporate's procurement or EHS team.
 
-**Why it exists:** To formally launch The Corporate's 2026 supplier sustainability assessment without requiring direct explanation from the internal team. The page gives every supplier the context, the correct path, the timeline, and the resources to act independently.
+**Why it exists:** v1.0 routed every supplier *out* of the page: an external link to EcoVadis, a file download, and an email exchange to return the completed questionnaire. That put the burden of collection on The Corporate's inbox and gave the supplier no confirmation that anything had been received. v2.0 keeps the supplier inside the portal from arrival to confirmation. The submission is made in the tool and acknowledged on screen.
 
-**Build status:** Retroactive spec — the tool exists as supplier_onboarding.html. This spec documents the existing build to establish Project Governor and Claude Code session compatibility, and to serve as the reference for any future iteration.
+**Build status:** Iteration — the previous version is a static single-page site (`supplier_onboarding.html`) with two outbound actions and a mailto link. This build adds four in-page submission doors, a guided multi-section form, an Excel/CSV upload-and-review flow, an on-screen confirmation view, a new in-hero navigation button, and replaces The Corporate's visual identity with the Data Leaf brand.
 
 ---
 
@@ -25,23 +27,27 @@
 
 ### Data Model
 
-**Decision:** D1
+**Decision:** D2
 
 | Label | What it means | This tool? |
 |-------|--------------|-----------|
-| D1 — Hardcoded | All data is written into the code by the developer. Users cannot input anything that persists. The tool displays what the developer put in. | Yes |
-| D2 — Session | Data enters the tool during use and disappears when the tab closes. No database. | No |
+| D1 — Hardcoded | All data is written into the code by the developer. Users cannot input anything that persists. The tool displays what the developer put in. | No |
+| D2 — Session | Data enters the tool during use and disappears when the tab closes. No database. Covers both uploaded files and form inputs. | Yes |
 | D3 — Persisted | Data is written to a database and survives after the session ends. Supabase is required. | No |
 
-**Reason:** All content on the page is fixed and written by the developer. The Excel file is a static asset served for download. No supplier input is collected or stored through this tool.
+**Reason:** Suppliers now enter answers and attach files inside the portal, but this MVP validates the submission experience only — the answers live in browser state for the length of the visit, are summarised on a confirmation screen, and are discarded when the tab closes. Nothing is written to a database or sent anywhere.
 
-**D3 triggers — none apply:**
+**D3 is triggered if any of the following are true — check all that apply:**
 - [ ] Data must be retrievable after the session ends
 - [ ] Multiple sessions contribute to the same dataset
 - [ ] An audit trail or history is needed
 - [ ] Data submitted by one person must be visible to another
 - [ ] Results must be accessible via a URL after the session ends
 - [ ] Files uploaded by users must be stored and retrievable later
+
+None apply in this build. All six are deliberately deferred — see Section 12.
+
+> **Builder's note, carried deliberately into the build:** because nothing is stored and no email is sent, a supplier who completes all seven sections sends their work nowhere. This is understood and accepted. This build proves the experience; connecting it to a destination is the next version. Claude Code must not invent a storage or delivery mechanism to "solve" this.
 
 ---
 
@@ -52,10 +58,22 @@
 | Label | What it means | This tool? |
 |-------|--------------|-----------|
 | A1 — Public | Anyone with the URL can use it. No login, no account required. | Yes |
-| A2 — Authentication | Users must log in. | No |
-| A3 — Authorization | Users must log in and have different roles. | No |
+| A2 — Authentication | Users must log in. All logged-in users see the same thing and have the same permissions. | No |
+| A3 — Authorization | Users must log in and have different roles. Different roles see different data or have different permissions. | No |
 
-**Reason:** The page is distributed to Tier 1 suppliers as a direct link. No account or login is required — any supplier who receives the URL can access it immediately.
+**Reason:** The portal is distributed to Tier 1 suppliers as a direct link. Any supplier who receives the URL can complete a submission immediately, with no account and no credentials.
+
+---
+
+### If Access Model is A2 — complete both questions
+
+N/A — Access Model is A1.
+
+---
+
+### If Access Model is A3 — define all roles
+
+N/A — Access Model is A1.
 
 ---
 
@@ -69,11 +87,13 @@
 | 2 | D3+A1 | Netlify + Supabase (no auth) | Netlify |
 | 3 | D3+A2 or D3+A3 | Netlify + Supabase (auth + RLS) | Netlify |
 
+D2 + A1 resolves to Tier 1. No Supabase project is created for this build.
+
 ---
 
 ### Standalone or Stack
 
-**This tool is:** Standalone — it does not share a database with any other tool.
+**This tool is:** Standalone — it does not share a database with any other tool. It has no database at all.
 
 ---
 
@@ -92,14 +112,18 @@
 | Detail | Answer |
 |--------|--------|
 | Format | XLSX |
-| What is exported | A pre-formatted Excel workbook — The Corporate Supplier Questionnaire 2026. Contains 7 sections mapped to ESRS: S1 General Information and EcoVadis Bypass, S2 Climate and Decarbonisation (E1), S3 Pollution and PFAS (E2), S4 Water and Marine Resources (E3), S5 Circular Economy and Waste (E5), S6 Biodiversity and Ecosystems (E4), S7 Social, Labour and Governance (S2, G1). The file is served as a static asset — no data is populated server-side. The supplier fills it offline and returns it via email or the process defined by The Corporate's EHS team. |
-| PDF design intent | N/A — format is XLSX only |
+| What is exported | The blank official template — `The_Corporate_Supplier_Questionnaire_2026.xlsx` — served as a static asset from `/assets/`. It contains the seven ESRS-mapped sections (S1–S7) and the declaration row. It is not populated server-side and carries no supplier data. It is the file a supplier downloads inside Path B door two, completes offline with colleagues, and uploads back into the portal. |
+| PDF design intent | N/A — format is XLSX only. No PDF is generated anywhere in this build. |
+
+> Nothing is exported at the end of a submission. The confirmation screen is on-screen only — there is no download of the supplier's own answers in this version.
 
 ---
 
 ### Email Arm
 
 **Active:** No
+
+> Explicit build rule: no email is sent by this tool, in either direction, under any circumstance. The `mailto:` link to the EHS Help Desk in Key Resources is a plain anchor that opens the visitor's own mail client — it is not an email arm and involves no server, no service, and no API key.
 
 ---
 
@@ -115,18 +139,49 @@
 
 | Detail | Answer |
 |--------|--------|
-| Frontend framework | HTML/CSS/JS — single-page, static, minimal interaction (two action buttons and a mailto link) |
+| Frontend framework | React + Vite + Tailwind. v1.0 was flat HTML/CSS/JS; this build has four submission doors, a seven-step form with back/next navigation, client-side file parsing, conditional questions, and an editable review table. That is real application state and must not be hand-rolled in a single HTML file. |
 | Deployment target | Netlify |
-| Netlify MCP | See Open Questions (Section 15) — confirm before build session |
+| Netlify MCP | Not active — deployment will be done manually through the Netlify dashboard. The builder connects the GitHub repo to Netlify after the build session; Netlify then deploys on every push to main. |
 
-**GitHub — pre-build requirement:**
-The builder creates the GitHub repo before the first Claude Code session. product-spec.md, CLAUDE.md, and PROGRESS.md must be uploaded to the repo root before Claude Code opens. Claude Code commits changes regularly and pushes to main. It does not create or configure the repo.
+**Client-side library for reading spreadsheets:** SheetJS (`xlsx`), imported as an npm dependency and bundled. All parsing happens in the browser. No file is uploaded to any server.
+
+**GitHub — pre-build requirement for all Tier 1, 2, and 3 tools:**
+The user creates the GitHub repo before the first Claude Code session. The product-spec.md, CLAUDE.md, and PROGRESS.md must be uploaded to the repo root before Claude Code opens. Claude Code assumes the repo exists, commits changes regularly, and pushes to main. It does not create or configure the repo.
+
+---
+
+### CONDITIONAL: Supabase project — only complete if Tier 2 or Tier 3
+
+N/A — this tool is Tier 1. No Supabase project, no `supabase-setup.md`, no database of any kind. Claude Code must not create one.
+
+---
+
+### CONDITIONAL: Only complete if this tool is part of a stack
+
+N/A — standalone.
 
 ---
 
 ## Section 5 — Data Architecture
 
-N/A — Data Model is D1. No database.
+N/A — Data Model is D2. No database.
+
+**Session-state inventory — what the tool holds in browser memory during a visit.** This is not a schema. It is listed so Claude Code knows the exact shape of the state object and what the confirmation screen must summarise. All of it is discarded on tab close.
+
+| State | Contents | Source |
+|-------|----------|--------|
+| `path` | `"ecovadis"` or `"full"` | Supplier's choice at the path chooser |
+| `door` | `"upload"` or `"form"` | Supplier's choice within the path |
+| `identity` | Company legal name, registered country, contact name, contact title, contact email | Typed by the supplier |
+| `ecovadisAnswers` | Nine EcoVadis fields (see Section 8) | Typed by the supplier |
+| `ecovadisFile` | One attached file, held in browser memory as a File object. Filename and size are displayed; contents are never parsed or read. | Supplier's file picker |
+| `assessmentAnswers` | Thirty question answers plus a per-question optional Notes / Evidence field | Typed in the guided form, or parsed from the uploaded workbook |
+| `declaration` | Authorised signatory name, date, accuracy confirmation checkbox | Typed by the supplier |
+| `submittedAt` | Timestamp generated at submit | Automatic |
+
+**File storage:** No. The EcoVadis attachment and the uploaded workbook are held in browser memory only. Neither is transmitted, and neither survives the tab.
+
+**Derived or calculated data:** No scoring, no grading, no index. The only derived values are an answered-question count and a submission timestamp, both used on the confirmation screen.
 
 ---
 
@@ -138,125 +193,377 @@ N/A — Access Model is A1. No authentication, no roles, no RLS.
 
 ## Section 7 — GDPR
 
-**GDPR outcome:** Not applicable — this tool is D1. No personal data is collected or stored through the tool. The Excel file is downloaded to the supplier's own device. No form submission occurs through this portal.
+**GDPR outcome:** Not applicable — confirmed during the interview. Personal data is typed into the tool (contact name, title, email, signatory name), but the Data Model is D2: nothing is transmitted, stored, or retained by The Corporate, Data Leaf, or any third party. The data never leaves the supplier's own browser, and no consent flow or deletion mechanism is required for data that is never collected.
+
+**Transparency requirement — build this even though GDPR does not apply.** Because suppliers will type identifying information into forms, the tool must say plainly what happens to it. A short notice appears in two places, in body text, not as a modal or a checkbox:
+
+1. Directly above the submit control on every door.
+2. On the confirmation screen.
+
+Exact copy for both:
+
+> Your answers stay in your browser. This portal does not store, transmit, or email anything you enter. Closing this tab clears it.
+
+This is a factual statement about the build, not a legal disclaimer. It must remain accurate — if a future version adds storage, this copy and this section both change.
 
 ---
 
 ## Section 8 — Screen and UI Structure
 
-### Landing Page (single scrolling view — no additional pages)
+The portal is a single-page application. The landing page is a scrolling view; the submission flows replace the page content and return to the landing page when complete. There is no page reload and no multi-URL routing requirement.
 
-**Purpose:** Route Tier 1 suppliers to the correct submission path and communicate The Corporate's sustainability expectations.
+---
 
-**What is visible (top to bottom):**
+### View 1 — Landing Page
 
-**Navigation bar**
-- The Corporate logo (left): boxed monogram + wordmark per brand spec
-- No additional nav items required for v1
+- **Purpose:** Communicate The Corporate's 2026 supplier programme, explain why the assessment is being asked for, and route each supplier to the correct submission path.
 
-**Hero section**
-- Overline label: "SUPPLIER PROGRAMME 2026" — rendered as a black pill with Acid Lime text (Pattern A per brand spec — black container, lime text, uppercase, tracked)
-- H1 (Playfair Display 700, 48px): "We don't just manufacture products. We engineer a sustainable future."
-- Body paragraph (DM Sans 300): "Our 2045 Net-Zero goal is a shared journey. This portal is your starting point — understand what we are asking, why it matters, and which submission path applies to you."
-- Stats row — 4 items displayed large side by side (tc-grid-4, stacks to 2-col on mobile):
-  - 690,000 / tCO₂e Total Footprint (2023, location-based)
-  - 71% / Scope 3 — Value Chain (location-based, 2023 base year)
-  - 2045 / Net-Zero Target Year
-  - 500+ / Tier 1 Suppliers
-  - Stat figures: Playfair Display 700 at display size. Labels: DM Sans caption/label style, Stone colour.
-  - Reference note (shown beneath the stats and repeated in the footer): "Scope 3 is 71% of the total footprint (location-based, 2023 base year)."
+- **What is visible (top to bottom):**
 
-**Section: Why We Are Asking**
-- H2: "Why We Are Asking"
-- Body copy: drafted by Claude Code following The Corporate brand voice (see Open Questions — builder reviews before deployment)
-- Content must cover: ESRS/CSRD regulatory context, The Corporate's supply chain Scope 3 exposure (71%, location-based, 2023 base year), and the shared-responsibility framing of the programme
+  **Navigation bar**
+  - Data Leaf wordmark, left-aligned. No logo file is provided — Claude Code renders the wordmark "Data Leaf" as type, in DM Sans Medium, Deep Space Blue. See Section 15.
+  - No additional nav items.
 
-**Section: Two Routes. One Destination.**
-- H2: "Two Routes. One Destination."
-- Two cards side by side (tc-grid-2, stacks on mobile):
-  - Card 1 — EcoVadis path:
-    - Label: "ECOVADIS SCORECARD"
-    - Description: explains that suppliers with a valid EcoVadis scorecard (issued within the last 12 months) may submit their scorecard link and skip the full questionnaire
-    - Primary CTA button ("Submit EcoVadis Scorecard") — opens ecovadis.com in a new tab
-  - Card 2 — Download path:
-    - Label: "FULL QUESTIONNAIRE"
-    - Description: explains that suppliers without an EcoVadis scorecard must download and complete the ESRS-aligned Excel questionnaire, then return it via email to The Corporate's EHS team
-    - Secondary CTA button ("Download Assessment") — triggers download of The_Corporate_Supplier_Questionnaire_2026.xlsx from the project's static assets folder
+  **Hero section**
+  - Overline label: "SUPPLIER PROGRAMME 2026" — uppercase, tracked, rendered in Burnt Clay on Mint Cream.
+  - H1: "We don't just manufacture products. We engineer a sustainable future."
+  - Body paragraph: "Our 2045 Net-Zero goal is a shared journey. This portal is your starting point — understand what we are asking, why it matters, and which submission path applies to you."
+  - Stats row — four figures side by side, collapsing to two columns on mobile:
+    - 690,000 — tCO₂e Total Footprint (2023, location-based)
+    - 71% — Scope 3, Value Chain (location-based, 2023 base year)
+    - 2045 — Net-Zero Target Year
+    - 500+ — Tier 1 Suppliers
+  - Reference note beneath the stats, repeated in the footer: "Scope 3 is 71% of the total footprint (location-based, 2023 base year)."
+  - **NEW — "Go to step 1" button**, positioned at the bottom of this hero section, after the stats row and the reference note. Primary button style (Burnt Clay). Clicking it smooth-scrolls the page to the "Two Routes. One Destination." section. It performs no other action — it does not open a form, does not select a path, and does not leave the page.
 
-**Section: What Happens Next**
-- H2: "What Happens Next."
-- 4-step numbered timeline (horizontal on desktop, vertical on mobile):
-  - 01 — Portal Launch — "You receive this link and select your submission path." — April 2026
-  - 02 — Data Submission — "Submit scorecard or complete questionnaire. 100% Tier 1 response required." — Deadline: 30 Sep 2026
-  - 03 — Review & Scoring — "Our EHS and Procurement teams review submissions and flag gaps." — Q4 2026
-  - 04 — Partnership Plans — "Joint decarbonisation and improvement plans agreed with prioritised suppliers." — Q1 2027
-  - Step numbers: Acid Lime on black (Pattern A). Dates/labels: Stone caption style. Step title: DM Sans 500. Description: DM Sans 300.
+  **Section: Why We Are Asking**
+  - H2: "Why We Are Asking"
+  - Body copy drafted by Claude Code in the Data Leaf voice — analytical, trustworthy, no alarmism, no hype. It must cover three things: the ESRS/CSRD regulatory context; The Corporate's Scope 3 exposure at 71% of total footprint (location-based, 2023 base year); and the shared-responsibility framing of the programme. The builder reviews this copy before deployment.
 
-**Section: Key Resources**
-- H2: "Key Resources" + subhead: "Everything you need."
-- 3 resource cards (tc-grid-3, stacks on mobile):
-  - Card 1 — Document:
-    - Label: "DOCUMENT"
-    - Title: "Supplier Code of Conduct"
-    - Body: "The Corporate's standards for ethical business conduct, labour rights, and environmental responsibility. All Tier 1 suppliers must have a signed copy on file."
-    - Link: "View Document" — URL is a placeholder at build time; builder provides the real document URL before deployment (see Open Questions)
-  - Card 2 — Policy:
-    - Label: "POLICY"
-    - Title: "Global Environmental Policy"
-    - Body: "The Corporate's commitments on climate, water, PFAS, and circular economy — the framework that defines what we expect from our value chain partners."
-    - Link: "View Policy" — URL is a placeholder at build time; builder provides the real document URL before deployment (see Open Questions)
-  - Card 3 — Support:
-    - Label: "SUPPORT"
-    - Title: "EHS Help Desk"
-    - Body: "Questions about specific ESRS requirements, measurement methodology, or technical aspects of the questionnaire? Contact our Environment, Health & Safety team directly."
-    - Link: "Contact EHS" — mailto:sustainability@thecorporate.com?subject=Supplier%20Portal%20Help%20Desk%20Query
+  **Section: Two Routes. One Destination.**
+  - H2: "Two Routes. One Destination."
+  - Two cards side by side, stacking on mobile:
+    - **Card 1 — EcoVadis path.** Label "ECOVADIS SCORECARD". Explains that suppliers holding a valid EcoVadis scorecard issued within the last 12 months may submit their scorecard details and skip the full questionnaire. Primary button: "Submit EcoVadis Scorecard" → opens View 2.
+    - **Card 2 — Full Assessment path.** Label "FULL QUESTIONNAIRE". Explains that suppliers without a current EcoVadis scorecard complete the ESRS-aligned assessment, and that they may either fill it in here or download it, complete it internally, and upload it back. Primary button: "Start Full Assessment" → opens View 4.
+  - Neither path is gated or hidden. The supplier self-selects.
 
-**Footer**
-- The Corporate logo (monogram or wordmark)
-- Copyright line: "© 2026 The Corporate. Confidential — for authorised Tier 1 suppliers only."
-- No additional footer links required for v1
+  **Section: What Happens Next**
+  - H2: "What Happens Next."
+  - Four-step numbered timeline, horizontal on desktop, vertical on mobile:
+    - 01 — Portal Launch — "You receive this link and select your submission path." — April 2026
+    - 02 — Data Submission — "Submit scorecard or complete the assessment. 100% Tier 1 response required." — Deadline: 30 Sep 2026
+    - 03 — Review & Scoring — "Our EHS and Procurement teams review submissions and flag gaps." — Q4 2026
+    - 04 — Partnership Plans — "Joint decarbonisation and improvement plans agreed with prioritised suppliers." — Q1 2027
 
-**User actions:**
-- Click "Submit EcoVadis Scorecard" — opens ecovadis.com in a new tab
-- Click "Download Assessment" — triggers browser download of The_Corporate_Supplier_Questionnaire_2026.xlsx
-- Click "View Document" — opens Supplier Code of Conduct (URL to be confirmed)
-- Click "View Policy" — opens Global Environmental Policy (URL to be confirmed)
-- Click "Contact EHS" — opens email client with pre-filled recipient and subject line
-- Scroll — single-page experience, no navigation between views
+  **Section: Key Resources**
+  - H2: "Key Resources" with subhead "Everything you need."
+  - Three cards, stacking on mobile:
+    - **Document** — "Supplier Code of Conduct" — "The Corporate's standards for ethical business conduct, labour rights, and environmental responsibility. All Tier 1 suppliers must have a signed copy on file." — link "View Document" (URL pending, see Section 15).
+    - **Policy** — "Global Environmental Policy" — "The Corporate's commitments on climate, water, PFAS, and circular economy — the framework that defines what we expect from our value chain partners." — link "View Policy" (URL pending, see Section 15).
+    - **Support** — "EHS Help Desk" — "Questions about specific ESRS requirements, measurement methodology, or technical aspects of the assessment? Contact our Environment, Health & Safety team directly." — link "Contact EHS" → `mailto:sustainability@thecorporate.com?subject=Supplier%20Portal%20Help%20Desk%20Query`.
 
-**What happens next:** All actions either open an external link in a new tab, trigger a file download, or open the user's email client. No page navigation occurs.
+  **Footer**
+  - Data Leaf wordmark.
+  - "© 2026 The Corporate. Confidential — for authorised Tier 1 suppliers only."
+  - Repeat of the Scope 3 reference note.
+
+- **User actions:** scroll; click "Go to step 1"; click "Submit EcoVadis Scorecard"; click "Start Full Assessment"; click the two resource links; click "Contact EHS".
+
+- **What happens next:** the two path buttons replace the page content with View 2 or View 4. The resource links and mailto open elsewhere. Everything else stays on this view.
+
+---
+
+### View 2 — Path A: EcoVadis Door Chooser
+
+- **Purpose:** Let the EcoVadis supplier choose how to submit their scorecard.
+- **What is visible:** H2 "EcoVadis Scorecard". One sentence confirming that a scorecard must have been issued within the last 12 months. Two door cards:
+  - **Door 1 — "Upload your scorecard"** — "Attach your EcoVadis scorecard and confirm the headline details."
+  - **Door 2 — "Enter your scorecard details"** — "Answer nine questions about your most recent EcoVadis cycle."
+  - A "Back" control returning to the landing page.
+- **User actions:** choose a door, or go back.
+- **What happens next:** opens View 3a or View 3b.
+
+---
+
+### View 3a — Path A Door One: Upload Scorecard
+
+- **Purpose:** Capture the scorecard file plus the five headline values.
+- **What is visible:**
+  - File picker, accepting PDF. Once a file is chosen, its filename and size are shown with a "Remove" control. The file is held in browser memory and is never read, parsed, or transmitted.
+  - Five fields, all required:
+
+    | Field | Type |
+    |-------|------|
+    | Company legal name | Text |
+    | Primary contact name, title, and email | Three separate fields: name (text), title (text), email (email format) |
+    | Publication date | Date |
+    | Valid until | Date |
+    | Overall EcoVadis score | Number, 0–100 |
+
+  - The transparency notice from Section 7, directly above the submit control.
+  - "Submit" and "Back" controls.
+- **User actions:** attach a file, fill the fields, submit, or go back.
+- **What happens next:** submit opens View 7 (Confirmation).
+
+---
+
+### View 3b — Path A Door Two: EcoVadis Form
+
+- **Purpose:** Capture the full EcoVadis scorecard detail in-page, with no file.
+- **What is visible:** the identity block (company legal name; contact name, title, email), then the nine EcoVadis questions in order:
+
+  | # | Question | Type |
+  |---|----------|------|
+  | Q1 | Publication date | Date |
+  | Q2 | Valid until | Date |
+  | Q3 | Overall EcoVadis score | Number, 0–100 |
+  | Q4 | Environment score | Number, 0–100 |
+  | Q5 | Labor & Human Rights score | Number, 0–100 |
+  | Q6 | Ethics score | Number, 0–100 |
+  | Q7 | Sustainable procurement score | Number, 0–100 |
+  | Q8 | Did your organisation receive a medal in the last cycle? | Dropdown: None / Bronze / Silver / Gold / Platinum |
+  | Q9 | Did your organisation receive a badge in the last cycle? | Dropdown: None / Committed / Other |
+
+  Plus the transparency notice, "Submit", and "Back".
+
+  > The source file spells Q8 and Q9 as "recieved" and "cicle". Claude Code corrects the spelling in the UI. The corrected wording above is authoritative.
+
+- **User actions:** fill fields, submit, go back.
+- **What happens next:** submit opens View 7.
+
+---
+
+### View 4 — Path B: Full Assessment Door Chooser
+
+- **Purpose:** Let the supplier choose between filling the assessment here and completing it offline.
+- **What is visible:** H2 "Full Assessment". One sentence noting that the assessment covers seven ESRS-aligned sections and around thirty questions. Two door cards:
+  - **Door 1 — "Fill it in here"** — "Work through the seven sections one at a time and submit when you're done. Your answers are not saved — set aside enough time to finish in one sitting."
+  - **Door 2 — "Download and upload"** — "Download the official template, complete it with your colleagues, and upload it back. Only the official template is accepted."
+  - A "Back" control.
+- **User actions:** choose a door, or go back.
+- **What happens next:** opens View 5 or View 6.
+
+---
+
+### View 5 — Path B Door One: Guided Assessment Form
+
+- **Purpose:** Walk the supplier through S1–S7, one section per screen, ending in the declaration.
+- **What is visible:**
+  - A progress indicator showing the current section and total (eight steps: S1–S7 plus Declaration).
+  - The current section's heading, its ESRS reference, and its questions. Every question shows its ESRS reference and its type. Every question carries an optional "Notes / evidence" free-text field beneath its answer field, mirroring column F of the template.
+  - "Back" and "Next" controls. "Back" on S1 returns to View 4.
+  - On the final step: the declaration block and the transparency notice, then "Submit".
+- **Full question set — this is the authoritative list. Claude Code builds exactly these, in this order.**
+
+  **S1 — General Information & EcoVadis Bypass** *(All ESRS · Required)*
+
+  | ID | Question | Type |
+  |----|----------|------|
+  | S1-1 | Legal name of the responding entity | Text, required |
+  | S1-2 | Registered country of the responding entity | Text, required |
+  | S1-3 | Primary contact name for this assessment | Text, required |
+  | S1-4 | Primary contact job title | Text, required |
+  | S1-5 | Primary contact email address | Email format, required |
+
+  > The template combines S1-1/S1-2 into one cell and S1-3/S1-4/S1-5 into another. The guided form splits them into discrete fields for clean validation. The upload parser reads the combined cells and does not attempt to split them — see Section 9.
+
+  **S2 — Climate & Decarbonisation** *(ESRS E1)*
+
+  | ID | ESRS | Question | Type |
+  |----|------|----------|------|
+  | S2-1 | E1-4 | Total Scope 1 emissions for last fiscal year (metric tonnes CO₂e). Include verification method. | Long text |
+  | S2-2 | E1-4 | Total Scope 2 emissions for last fiscal year — market-based (metric tonnes CO₂e). | Number |
+  | S2-3 | E1-4 | Total Scope 3 emissions for last fiscal year (metric tonnes CO₂e). | Number |
+  | S2-4 | E1-4 | Specify which Scope 3 categories are included. | Long text |
+  | S2-5 | E1-3 | Does your organisation have a Science-Based Target (SBTi) validated decarbonisation target? | Dropdown: Yes — validated / Yes — submitted, awaiting validation / In progress / No |
+  | S2-6 | E1-2 | Describe your top three decarbonisation projects currently in progress or planned for the next 24 months. Include estimated tCO₂e reduction and the specific technology being utilised (e.g. electrification of heat, on-site renewables). | Long text |
+  | S2-7 | E1-2 | What are the primary technical or financial barriers preventing you from reaching a 50% reduction in Scope 1 and 2 emissions by 2030? | Long text |
+
+  **S3 — Pollution & PFAS** *(ESRS E2)*
+
+  | ID | ESRS | Question | Type |
+  |----|------|----------|------|
+  | S3-1 | E2-3 | Total weight of substances of concern (REACH, SVHC list) used in production last fiscal year (kg). | Number |
+  | S3-2 | E2-3 | Do any of your products or production processes contain or utilise PFAS compounds ("forever chemicals")? | Dropdown: Yes / No / Under investigation |
+  | S3-3 | E2-3 | If your products contain PFAS, detail your substitution roadmap. Have you identified viable non-PFAS alternatives? Provide your target date for a complete phase-out. | Long text — conditionally required, see Section 9 |
+  | S3-4 | E2-2 | Describe your industrial wastewater treatment process. What specific measures are in place to ensure zero leakage of hazardous chemicals into local water systems? | Long text |
+
+  **S4 — Water & Marine Resources** *(ESRS E3)*
+
+  | ID | ESRS | Question | Type |
+  |----|------|----------|------|
+  | S4-1 | E3-1 | Total water withdrawal last fiscal year (m³). | Number |
+  | S4-2 | E3-2 | Specify the primary source of that water withdrawal. | Dropdown: Municipal supply / Groundwater / Surface water / Rainwater harvesting / Seawater or desalinated / Mixed sources |
+  | S4-3 | E3-1 | Is your primary production facility located in a high-water-stress region (WRI Aqueduct score ≥ 3)? | Dropdown: Yes / No / Not assessed |
+  | S4-4 | E3-2 | Provide details on any water-saving or closed-loop recycling projects implemented at your facility. How has your total water intensity (litres per unit produced) changed over the last three years? | Long text |
+  | S4-5 | E3-2 | If your facility is in a high-water-stress region, what is your operational contingency plan for severe drought conditions to ensure supply continuity to The Corporate? | Long text — conditionally required, see Section 9 |
+
+  **S5 — Circular Economy & Waste** *(ESRS E5)*
+
+  | ID | ESRS | Question | Type |
+  |----|------|----------|------|
+  | S5-1 | E5-2 | Total waste generated last fiscal year (tonnes). Provide the breakdown: landfill / recycled / energy recovery / hazardous. | Long text |
+  | S5-2 | E5-4 | Percentage of post-consumer recycled (PCR) content in the components supplied to The Corporate (%). | Number, 0–100 |
+  | S5-3 | E5-3 | How are you incorporating circularity into the specific components you supply to The Corporate? Examples: design for disassembly, modularity, or increasing PCR content. | Long text |
+  | S5-4 | E5-2 | Detail your strategy for achieving Zero Waste to Landfill. What are your primary waste streams, and what innovative recycling or upcycling initiatives have you launched recently? | Long text |
+
+  **S6 — Biodiversity & Ecosystems** *(ESRS E4)*
+
+  | ID | ESRS | Question | Type |
+  |----|------|----------|------|
+  | S6-1 | E4-2 | Are any of your production sites located within or adjacent to (within 1 km) a protected area or biodiversity hotspot? | Dropdown: Yes / No / Not assessed |
+  | S6-2 | E4-3 | Describe any initiatives taken to minimise the impact of your operations on local biodiversity. Include land-use management, native planting schemes, or light/noise pollution reduction. | Long text |
+  | S6-3 | E4-5 | Have you undertaken a biodiversity impact assessment (TNFD or equivalent) for your primary production sites? If yes, share key findings. If no, provide your target assessment date. | Long text |
+
+  **S7 — Social, Labour & Governance** *(ESRS S2 · G1)*
+
+  | ID | ESRS | Question | Type |
+  |----|------|----------|------|
+  | S7-1 | S2-1 | Does your organisation have a formal Human Rights and Labour Rights Policy, aligned with the UN Guiding Principles on Business and Human Rights? | Dropdown: Yes / In development / No |
+  | S7-2 | S2-2 | Have you conducted a human rights due diligence assessment of your Tier 1 and Tier 2 supply chains in the last 24 months? | Dropdown: Yes — both tiers / Yes — Tier 1 only / In progress / No |
+  | S7-3 | S2-4 | Describe the grievance mechanism available to workers in your supply chain. How many grievances were filed and resolved in the last 12 months? | Long text |
+  | S7-4 | G1-1 | Does your organisation have a verified conflict minerals policy (3TG — tin, tantalum, tungsten, gold) in place, including OECD Due Diligence guidance compliance? | Dropdown: Yes / In development / No / Not applicable to our products |
+  | S7-5 | G1-2 | Describe your supplier code of conduct and how compliance is monitored across your own supply chain. Include details of any third-party audits conducted in the last 24 months. | Long text |
+
+  **Step 8 — Declaration**
+
+  Fixed text: "I confirm that the information provided in this assessment is accurate and complete to the best of my knowledge."
+
+  | Field | Type |
+  |-------|------|
+  | Authorised signatory name | Text, required |
+  | Date | Date, required, defaults to today |
+  | Accuracy confirmation | Checkbox, required |
+
+- **User actions:** answer questions, move between sections, submit on the last step, or leave via Back on S1.
+- **What happens next:** submit opens View 7.
+
+---
+
+### View 6 — Path B Door Two: Download and Upload
+
+- **Purpose:** Serve the official template and accept it back, completed.
+- **What is visible, in this order:**
+  1. **Download panel.** H3 "Step one — download the template". Body: "Complete it with whoever needs to contribute, then come back to this page and upload it." Button "Download Assessment" — downloads `/assets/The_Corporate_Supplier_Questionnaire_2026.xlsx` via an anchor with the `download` attribute. This is the same download button that existed in v1.0; it now lives here.
+  2. **Upload panel.** H3 "Step two — upload the completed file". A file picker accepting `.xlsx` and `.csv`. Clear body copy: "Only the official template above is accepted. Upload the workbook itself, or its CSV export."
+  3. **On a rejected file:** a plain error message naming exactly what failed (see Section 9). The file is cleared and the supplier can try again. No partial data is carried forward from a rejected file.
+  4. **On an accepted file:** the view switches to the **review table** — every one of the thirty questions listed in order, grouped by section, each with the answer parsed from the file shown in an editable field, and the parsed Notes / evidence beside it. Questions the file left blank are shown as empty and clearly marked "Not answered". The supplier can edit any field here.
+  5. Below the review table: the declaration block (signatory name, date, accuracy checkbox), the transparency notice, and "Submit".
+  - A "Back" control at every stage returns to View 4.
+- **User actions:** download the template; choose a file; correct or complete answers in the review table; fill the declaration; submit; go back.
+- **What happens next:** submit opens View 7.
+
+---
+
+### View 7 — Confirmation
+
+- **Purpose:** Acknowledge the submission on screen. This is the end of every door.
+- **What is visible:**
+  - H2 "Submission complete."
+  - A summary block stating: which path was taken (EcoVadis Scorecard or Full Assessment); which door was used (filled in here / uploaded / attached); the company legal name and contact email as entered; the number of questions answered out of the total for that path; the file name, if a file was attached or uploaded; the signatory name and declaration date, for Path B; and the submission timestamp.
+  - The transparency notice from Section 7.
+  - A short "What happens next" restatement pointing at the 30 September 2026 deadline and the EHS Help Desk mailto for questions.
+  - One action: "Start another submission" — clears all session state and returns to the landing page.
+- **User actions:** read the summary; start another submission; use the Help Desk link.
+- **What happens next:** starting another submission resets state entirely. Closing the tab discards everything.
 
 ---
 
 ## Section 9 — Logic and Calculations
 
-This tool contains no calculations, no scoring, and no conditional rendering based on user input.
+This tool performs no scoring, grading, or calculation. It applies four sets of rules: upload validation, conditional questions, submit gating, and the confirmation summary.
 
-Both submission paths (EcoVadis and Excel download) are visible simultaneously. The EcoVadis logic — "if you have a valid scorecard, you may skip the full questionnaire" — is communicated to the supplier in copy only. The tool does not gate or hide either path based on any user selection. The supplier self-selects and acts.
+### 9.1 — Upload validation (View 6)
 
-**The two interactive elements and their behaviour:**
+**What is checked:** whether the uploaded file is the official template.
 
-| Element | Behaviour |
-|---------|-----------|
-| "Submit EcoVadis Scorecard" button | Opens https://ecovadis.com in a new tab (target="_blank", rel="noopener noreferrer") |
-| "Download Assessment" button | Triggers download of /assets/The_Corporate_Supplier_Questionnaire_2026.xlsx using an HTML anchor with the download attribute |
+**Inputs:** the file the supplier selects — `.xlsx` or `.csv`.
+
+**Rules, applied in order. The first failure stops the process and shows its message.**
+
+| # | Check | Failure message shown to the supplier |
+|---|-------|--------------------------------------|
+| 1 | File extension is `.xlsx` or `.csv`. | "This portal accepts the official template as an Excel workbook (.xlsx) or its CSV export. Please upload one of those." |
+| 2 | The file can be opened and read. | "We couldn't read that file. It may be corrupted or password-protected. Try re-saving it and uploading again." |
+| 3 | For `.xlsx`: a sheet named `Supplier Assessment 2026` exists. For `.csv`: skip this check — a CSV export carries no sheet name. | "This doesn't look like the official template — we couldn't find the 'Supplier Assessment 2026' sheet. Download the template above and use that file." |
+| 4 | The header row contains the columns SECTION, ESRS REF, TYPE, QUESTION / METRIC, SUPPLIER RESPONSE, NOTES / EVIDENCE, STATUS. | "This doesn't look like the official template — the column headings don't match. Download the template above and use that file." |
+| 5 | Every one of the thirty question texts in the template appears in the QUESTION / METRIC column, in the template's order. Comparison is case-insensitive and ignores leading/trailing whitespace and non-breaking spaces. | "This file doesn't match the official 2026 template. [N] of the 30 questions are missing or have been changed. Download a fresh copy of the template above and transfer your answers into it." |
+
+**On pass:** read column E (Supplier Response) and column F (Notes / Evidence) for each of the thirty question rows into session state, then render the review table. Column G (Status) is an internal column — ignore it entirely. Rows 1–4 (title, subtitle, header, instructions) and the section header rows are structural — skip them. If the file also carries values in the declaration row, read the signatory name and date into the declaration block as prefilled values.
+
+**Deliberately tolerated defects.** The shipped template has three faults. The parser must accept the template exactly as it is, and the guided form must present the corrected version:
+
+| Template defect | Parser behaviour | Guided form behaviour |
+|-----------------|------------------|----------------------|
+| Row 23 ("Specify source.") is tagged `S5` in the SECTION column but sits inside the water section and carries an E3-2 reference. | Match this row by its question text, not its section tag. Accept `S5` without complaint. | Present it as S4-2, inside Water & Marine Resources, where it belongs. |
+| Row 12 ("Specify scope 3 categories included.") has no response, notes, or status cells — the row ends at column D. | Read columns E and F as empty if they are absent. Do not treat the missing cells as a structural mismatch. | Present it as S2-4 with a normal long-text answer field and notes field. |
+| No dropdown question carries an option list. | Accept whatever text the supplier typed in the response cell, verbatim. Never reject an answer for not matching an option. Show it as typed in the review table. | Present the option sets defined in Section 8. |
+
+**Edge cases:** an empty file, a file with the right structure but no answers at all, and a file where every answer is blank all pass validation and land on the review table with everything marked "Not answered" — the supplier fills it in there. A file over 10 MB is rejected with "That file is larger than 10 MB. Please upload the completed template, not a document pack." Selecting a second file replaces the first entirely; no answers from the first survive.
+
+### 9.2 — Conditional questions
+
+| Trigger | Effect |
+|---------|--------|
+| S3-2 (PFAS) answered "Yes" | An inline notice appears immediately beneath it: "Answering yes flags this submission for PFAS risk review by The Corporate's EHS team." S3-3 (substitution roadmap) becomes required and cannot be left blank. |
+| S3-2 answered "Under investigation" | The same notice appears, worded "This answer flags your submission for PFAS risk review." S3-3 stays optional. |
+| S3-2 answered "No" | No notice. S3-3 stays visible and optional. |
+| S4-3 (high-water-stress region) answered "Yes" | S4-5 (drought contingency plan) becomes required. |
+
+These rules apply identically in the guided form and in the upload review table. The notice is informational only — it changes nothing about where the submission goes, because the submission goes nowhere in this build.
+
+### 9.3 — Submit gating
+
+| Door | Cannot submit until |
+|------|--------------------|
+| View 3a — EcoVadis upload | All five headline fields are filled, the email field is a valid email address, the two dates are valid dates, the overall score is a number between 0 and 100, and a file is attached. |
+| View 3b — EcoVadis form | Company name, contact name, title and a valid email are filled; both dates are valid; every score present is a number between 0 and 100. Scores may be left blank if the supplier's scorecard does not include that theme. |
+| View 5 — Guided assessment | All five S1 fields are filled with a valid email; every conditionally-required question triggered under 9.2 is answered; the signatory name is filled, the date is valid, and the accuracy checkbox is ticked. Questions outside S1 and the conditional rules may be left blank — a genuine gap is a valid answer and must not be blocked. |
+| View 6 — Upload review | Same rules as View 5, applied to the reviewed answers. |
+
+Blocked submissions show which fields need attention, and the guided form jumps to the section containing the first of them. Nothing is silently dropped.
+
+### 9.4 — Confirmation summary
+
+**Inputs:** the session state object.
+**Output:** the summary block in View 7.
+**Answered-question count:** a question counts as answered if its response field contains any non-whitespace character. Notes / evidence fields do not count.
+
+The denominator differs by door, because S1 is one thing in the template and five fields in the guided form:
+
+| Door | Denominator | Why |
+|------|-------------|-----|
+| View 5 — guided assessment | 33 | The 30 template rows, with S1's two combined rows split into five discrete fields |
+| View 6 — upload review | 30 | One per template row, matching the file the supplier uploaded |
+| View 3b — EcoVadis form | 9 | Q1–Q9 |
+| View 3a — EcoVadis upload | No count — list the five headline fields and the attached filename instead | |
+**Timestamp:** generated at the moment of submit, in the visitor's local timezone, formatted "4 September 2026, 14:32".
 
 ---
 
 ## Section 10 — Brand and Visual Direction
 
-**Brand reference:** the-corporate-brand skill file — upload flat to the repo root before the build session. Claude Code installs it to .claude/skills/ in First Session Setup.
+**Brand reference:** `data-leaf-brand` skill file — upload flat to the repo root before the build session. Claude Code installs it to `.claude/skills/` in First Session Setup and reads it before writing a line of markup or copy.
 
-**Visual feel:** Corporate minimalism — restraint over decoration. Precise, direct, composed, authoritative. No gradients, no shadows, no rounded corners.
+> This replaces `the-corporate-brand`, which governed v1.0. The Corporate's visual identity — Playfair Display, Acid Lime, Ink/Stone/Linen, the boxed monogram, the black pill label pattern — is removed from this build entirely. Claude Code must not carry any of it forward. The Corporate remains the named owner of the programme in the copy; Data Leaf is the platform the portal runs on.
 
-**Key brand rules Claude Code must enforce throughout:**
-- Fonts: Playfair Display (headlines), DM Sans 300 (body), DM Sans 500 (labels/emphasis) — import from Google Fonts CDN
-- Colours: Ink (#000000), Stone (#B6B09F), Linen (#EAE4D5), Chalk (#F2F2F2), White (#FFFFFF), Acid Lime (#C8F135)
-- Acid Lime: maximum 2 uses per page. Always against #000000 (never directly on light backgrounds). Used here for the "Supplier Programme 2026" label and the step number indicators in the timeline.
-- Buttons: square corners (border-radius: 0), no shadows
-- Cards: square corners, 0.5px Stone border, Linen or White background
-- No blue links — underline + Ink colour only
-- All copy follows The Corporate voice rules: short declarative sentences, active voice, no exclamation points, no emoji
+**Colours — from the brand skill:**
+
+| Role | Hex | Usage in this tool |
+|------|-----|-------------------|
+| Base 1 — Mint Cream | `#EEF4F0` | Page background, cards |
+| Base 2 — Silver | `#DAD9D9` | Alternate sections, form step backgrounds, table rows |
+| Dark / text — Deep Space Blue | `#0B3142` | All body text, headings, nav |
+| Anchor — Deep Teal | `#37663E` | Sustainability identity, secondary text, secondary buttons, section markers |
+| CTA — Burnt Clay | `#B35634` | Primary buttons ("Go to step 1", "Submit EcoVadis Scorecard", "Start Full Assessment", "Next", "Submit"), links, the hero overline label |
+
+**Typography:** DM Sans Medium (500) for all headings, including stat figures and section headers. Inter Regular (400) for all body text, form labels, questions, and table content. Import both from the Google Fonts CDN.
+
+**Visual feel:** clean and minimal, data-forward, calm. Technical precision in service of environmental impact.
+
+**Voice — applies to every word Claude Code writes, including error messages and button labels:** analytical, trustworthy, light, sustainable. No startup hype. No alarmism or fear-mongering about climate. No exclamation points. No emoji. Short declarative sentences.
+
+**Reference or inspiration:** none provided. `tokens.css` ships inside the brand skill package — use it as the source of the CSS custom properties rather than retyping hex values.
 
 ---
 
@@ -264,26 +571,37 @@ Both submission paths (EcoVadis and Excel download) are visible simultaneously. 
 
 This tool requires no external services and no API keys.
 
-| Service | What it does | Key required | Where stored |
-|---------|-------------|-------------|-------------|
+| Service | What it does in this tool | Key required | Where key is stored |
+|---------|--------------------------|-------------|-------------------|
 | None | — | — | — |
 
-The Excel file is served as a static asset in the project's /assets/ folder. The EcoVadis button is a hardcoded URL. The Contact EHS button is a mailto: link. No server-side function, no API call, and no environment variable is required for this tool.
+Everything runs in the browser. The template is a static asset in `/assets/`. Spreadsheet parsing uses SheetJS, bundled at build time. The Contact EHS link is a `mailto:`. There is no server-side function, no API call, no database connection, and no environment variable in this build.
 
-**Credentials readiness:** Nothing to prepare before the build session.
+**Credentials readiness:**
+
+| Credential | Status | Where to get it |
+|-----------|--------|----------------|
+| None required | — | — |
+
+Nothing to prepare before the build session.
 
 ---
 
 ## Section 12 — Out of Scope — Phase 2
 
+Claude Code will not build anything listed here. Do not add any of it, even where it would obviously improve the tool.
+
 | Deferred feature | Reason it is deferred |
 |-----------------|----------------------|
-| Online form — suppliers fill questionnaire responses in the browser | Adds D3 complexity (database, storage); v1 validates the workflow using the offline Excel |
-| Internal review dashboard — procurement/EHS team reviews submissions in a tool | Requires a separate Tier 2 or Tier 3 tool in a stack; not needed to validate the supplier onboarding flow |
-| Automated email notification on Excel download | Requires Email arm and server-side function; not required for v1 |
-| Submission tracker — shows % of Tier 1 suppliers who have responded | Requires D3 and likely a supplier roster; deferred to the internal review tool |
-| Supplier login and saved progress | Moves the tool to Tier 3; deferred to a future build iteration |
-| Automated EcoVadis scorecard validation | Requires EcoVadis API access; deferred pending API availability |
+| Database storage of submissions | Confirmed decision — this build is frontend-only, D2. Adding storage moves the tool to Tier 2 and requires a Supabase project. This is the single most important item on this list, and it is the natural next version. |
+| Any delivery of the submission to The Corporate — email, webhook, API, file drop | Confirmed decision — no email arm, no server-side function. The submission ends at the on-screen confirmation. |
+| Download of the supplier's own completed answers at the end | Considered and declined for this build. The confirmation is on-screen only. Reconsider alongside storage in the next version. |
+| Internal EHS review dashboard | Requires a separate Tier 2 or Tier 3 tool sharing a database. Not needed to validate the supplier submission flow. |
+| Save and resume, or supplier accounts | Moves the tool to Tier 3. The download-and-upload door is the answer for assessments needing several contributors. |
+| AI scoring or gap analysis of submitted answers | Requires the AI API arm and a defined scoring methodology. Not needed to validate the flow. |
+| Automated EcoVadis scorecard validation | Requires EcoVadis API access. Deferred pending API availability. |
+| Reading or parsing the uploaded EcoVadis PDF | The attachment is held and its filename displayed. Its contents are never read. The five typed fields carry the data. |
+| Submission tracker showing Tier 1 response rates | Requires storage and a supplier roster. |
 
 ---
 
@@ -291,16 +609,29 @@ The Excel file is served as a static asset in the project's /assets/ folder. The
 
 | # | What to verify | Expected result | Done? |
 |---|---------------|-----------------|-------|
-| 1 | Page loads and all 7 content sections render in the correct order | Hero, Why We Are Asking, Two Routes, What Happens Next, Key Resources, Footer — all visible on first load with no layout breaks | [ ] |
-| 2 | Brand identity is applied correctly throughout | Playfair Display headlines, DM Sans 300 body, correct colour tokens (Ink, Stone, Linen, Chalk), square corners on all cards and buttons, Acid Lime used at most twice | [ ] |
-| 3 | Stats row displays all 4 figures correctly | 690,000 / 71% / 2045 / 500+ render with correct labels and no formatting errors | [ ] |
-| 4 | "Supplier Programme 2026" label renders as a black pill with Acid Lime text | Pattern A applied: black background, Acid Lime text, uppercase, tracked — not placed directly on a light background | [ ] |
-| 5 | "Submit EcoVadis Scorecard" button opens the correct URL in a new tab | Clicking opens https://ecovadis.com in a new tab; original tab remains on the portal | [ ] |
-| 6 | "Download Assessment" button triggers file download | Clicking initiates browser download of The_Corporate_Supplier_Questionnaire_2026.xlsx; file is the correct, complete Excel workbook | [ ] |
-| 7 | "Contact EHS" link opens email client with pre-filled fields | Mailto opens with recipient sustainability@thecorporate.com and subject "Supplier Portal Help Desk Query" | [ ] |
-| 8 | Timeline section displays all 4 steps with correct dates and copy | Steps 01–04 render with correct titles, descriptions, and date labels in the correct order | [ ] |
-| 9 | Page is fully responsive on mobile | All grid sections (stats, routes, timeline, resources) collapse to single-column or 2-column layout on viewports below 768px; no horizontal overflow; buttons are full-width and tappable | [ ] |
-| 10 | Tool deploys to Netlify and is accessible at the live URL | Live URL loads correctly on desktop and mobile; no 404 errors; Excel file downloads correctly from the deployed site | [ ] |
+| 1 | Landing page renders in full | Nav, hero, stats, Why We Are Asking, Two Routes, timeline, Key Resources, footer — all present, in order, no layout breaks | [ ] |
+| 2 | Data Leaf brand is applied and The Corporate's brand is gone | DM Sans headings, Inter body, the five Data Leaf colours in their assigned roles. No Playfair Display, no Acid Lime, no Ink/Stone/Linen, no black pill label, anywhere in the build | [ ] |
+| 3 | "Go to step 1" button | Present at the foot of the hero, below the stats and reference note. Smooth-scrolls to "Two Routes. One Destination." Opens nothing, selects nothing, leaves the page nowhere | [ ] |
+| 4 | Path A door chooser | "Submit EcoVadis Scorecard" opens View 2 showing two doors. Neither door is hidden or gated | [ ] |
+| 5 | Path A door one — upload | PDF attaches, filename and size display, all five fields validate, submit blocked until complete, submit opens the confirmation | [ ] |
+| 6 | Path A door two — form | All nine EcoVadis questions render with the types and option sets in Section 8; "recieved"/"cicle" are spelled correctly | [ ] |
+| 7 | Path B door chooser | "Start Full Assessment" opens View 4 showing both doors, with the one-sitting warning on door one | [ ] |
+| 8 | Guided form covers all seven sections | Eight steps (S1–S7 plus Declaration); all 33 fields render in the Section 8 order — the 30 template rows, with S1's two combined rows split into five — with correct ESRS references, types, option sets, and a notes field each; back/next work in both directions without losing answers | [ ] |
+| 9 | Template defects corrected in the guided form | "Specify source" appears as S4-2 inside Water & Marine Resources; "Specify scope 3 categories" appears as S2-4 with a working answer field | [ ] |
+| 10 | Download button | Present inside Path B door two. Downloads the correct, complete `The_Corporate_Supplier_Questionnaire_2026.xlsx` from `/assets/` | [ ] |
+| 11 | Upload accepts the official template | Uploading the unmodified template — as `.xlsx` and again as its `.csv` export — passes all five checks and reaches the review table | [ ] |
+| 12 | Upload rejects everything else | A different workbook, a renamed sheet, an altered question, and a non-spreadsheet file are each rejected with the specific message from Section 9.1. No partial data carries forward from a rejection | [ ] |
+| 13 | Review table shows parsed answers back | Every answer in the uploaded file appears against its question, editable; blank answers are marked "Not answered"; notes/evidence are carried across; the Status column is ignored | [ ] |
+| 14 | PFAS conditional rule | Answering S3-2 "Yes" shows the risk-review notice and makes S3-3 required; submission is blocked while S3-3 is blank. Same behaviour in the guided form and the review table | [ ] |
+| 15 | Water-stress conditional rule | Answering S4-3 "Yes" makes S4-5 required in both the guided form and the review table | [ ] |
+| 16 | Declaration gate | Path B cannot submit without signatory name, a valid date, and the ticked accuracy checkbox | [ ] |
+| 17 | Genuine gaps are allowed | A Path B submission with several non-required questions left blank submits successfully | [ ] |
+| 18 | Confirmation screen | Shows path, door, company, contact email, answered count out of total, file name where applicable, signatory and date for Path B, and the timestamp — accurate to what was actually entered | [ ] |
+| 19 | Nothing is stored, nothing is sent | No network request leaves the page on submit. Reloading the tab after a submission shows a clean landing page with no retained answers. No email is sent by the tool | [ ] |
+| 20 | Transparency notice | The Section 7 copy appears above every submit control and on the confirmation screen, worded exactly as specified | [ ] |
+| 21 | "Start another submission" | Clears all session state — a new submission starts with every field empty and no attached file | [ ] |
+| 22 | Responsive on mobile | All grids collapse below 768px; the guided form is usable one section per screen; the review table scrolls horizontally inside its own container without the page scrolling sideways; buttons are full-width and tappable | [ ] |
+| 23 | Deploys to Netlify | Live URL loads on desktop and mobile, no 404s, the template downloads correctly from the deployed site | [ ] |
 
 ---
 
@@ -312,15 +643,15 @@ The Excel file is served as a static asset in the project's /assets/ folder. The
 
 ### Pre-build steps — complete these before opening Claude Code
 
-- [ ] Tool Architect skill — interview complete, this spec is written and confirmed
+- [ ] Tool Architect skill — interview complete, this spec is written and confirmed by the builder
 - [ ] Project Governor skill — CLAUDE.md and PROGRESS.md produced from this spec
 - [ ] GitHub repo created by the builder
 - [ ] product-spec.md uploaded to the GitHub repo root
 - [ ] CLAUDE.md uploaded to the GitHub repo root
 - [ ] PROGRESS.md uploaded to the GitHub repo root
-- [ ] the-corporate-brand skill file uploaded to the GitHub repo root
-- [ ] The_Corporate_Supplier_Questionnaire_2026.xlsx placed in /assets/ (or equivalent static folder) in the repo
-- [ ] Netlify connected to the GitHub repo (skip if Netlify MCP is active)
+- [ ] `data-leaf-brand` skill file uploaded flat to the GitHub repo root
+- [ ] `The_Corporate_Supplier_Questionnaire_2026.xlsx` placed in `/assets/` (or the equivalent static folder) in the repo — this is the file suppliers download and upload back, and the file the parser validates against
+- [ ] Netlify connected to the GitHub repo (Netlify MCP is not active for this build)
 - [ ] No credentials to prepare for this tool
 
 ---
@@ -328,14 +659,14 @@ The Excel file is served as a static asset in the project's /assets/ folder. The
 ### Tier 1 — build session
 
 - [ ] Open Claude Code in the project folder (GitHub repo connected to Netlify)
-- [ ] Claude Code runs First Session Setup: creates docs/, moves reference files, installs the-corporate-brand skill to .claude/skills/
+- [ ] Claude Code runs First Session Setup: creates `docs/`, moves reference files, installs `data-leaf-brand` to `.claude/skills/`
 - [ ] Claude Code reads product-spec.md, CLAUDE.md, and PROGRESS.md
-- [ ] Claude Code drafts the "Why We Are Asking" section body copy following The Corporate brand voice; builder reviews before deployment
-- [ ] Claude Code confirms document URLs for "View Document" and "View Policy" with the builder, or leaves as # if not yet available
+- [ ] Claude Code confirms `The_Corporate_Supplier_Questionnaire_2026.xlsx` is present in `/assets/` before building the upload parser — the parser's validation rules are derived from that exact file
+- [ ] Claude Code drafts the "Why We Are Asking" body copy in the Data Leaf voice; builder reviews before deployment
+- [ ] Claude Code confirms the document URLs for "View Document" and "View Policy" with the builder, or leaves them as `#` and flags them
 - [ ] Claude Code builds the tool
-- [ ] Test locally before deploying
-- [ ] **If Netlify MCP active:** Claude Code deploys automatically
-- [ ] **If Netlify MCP not active:** push to main → Netlify deploys automatically
+- [ ] Test locally before deploying — including the upload flow with the real template as `.xlsx` and as a `.csv` export, and with at least one file that must be rejected
+- [ ] Push to main → Netlify deploys automatically
 
 ---
 
@@ -343,11 +674,13 @@ The Excel file is served as a static asset in the project's /assets/ folder. The
 
 | Question | Who answers it | Blocking? |
 |----------|---------------|-----------|
-| Is Netlify MCP active — is Netlify connected via Claude Desktop Connectors for this project? | Builder — confirm before opening Claude Code | No — can deploy manually if not active |
-| What is the deployed URL for this tool? | Builder | No — can be confirmed after first deployment |
-| What is the real URL for the Supplier Code of Conduct document? | Builder — provide before or during the build session | No — Claude Code will leave as # and flag for builder to update |
-| What is the real URL for the Global Environmental Policy document? | Builder — provide before or during the build session | No — Claude Code will leave as # and flag for builder to update |
-| "Why We Are Asking" section — body copy not provided in the interview | Claude Code drafts during the build session following The Corporate brand voice; builder reviews before deployment | No — Claude Code resolves during build |
+| Data Leaf has no logo file — the brand skill flags this as a functional gap. Is a logo available, or does Claude Code render the wordmark as type? | Builder | No — Claude Code renders "Data Leaf" as a DM Sans Medium wordmark in Deep Space Blue and flags it for replacement |
+| What is the real URL for the Supplier Code of Conduct document? | Builder | No — Claude Code leaves it as `#` and flags it |
+| What is the real URL for the Global Environmental Policy? | Builder | No — Claude Code leaves it as `#` and flags it |
+| "Why We Are Asking" body copy is not written | Claude Code drafts it in the Data Leaf voice during the build; builder reviews before deployment | No |
+| EcoVadis badge options — the source file asks about badges without listing them. Section 8 specifies None / Committed / Other. Does that match what The Corporate expects to see? | Builder | No — the specified options ship unless the builder says otherwise |
+| Should the three template defects be fixed in the shipped `.xlsx` itself, so future suppliers download a clean file? | Builder | No — the parser tolerates them either way. If the template is corrected later, the parser's question-text list must be updated to match |
+| What is the deployed URL for this tool? | Builder | No — confirmed after first deployment |
 
 ---
 
@@ -355,7 +688,8 @@ The Excel file is served as a static asset in the project's /assets/ folder. The
 
 | Version | Date | What changed in the tool |
 |---------|------|--------------------------|
-| v1.0 | 12 June 2026 | Retroactive spec of the existing supplier onboarding landing page (supplier_onboarding.html). Spec created to establish Project Governor and Claude Code session compatibility. |
+| v1.0 | 12 June 2026 | Retroactive spec of the existing supplier onboarding landing page (`supplier_onboarding.html`). Static, D1, Tier 1. Two outbound actions — an external EcoVadis link and an Excel download — plus a mailto to the EHS team. Completed questionnaires returned by email. The Corporate brand. |
+| v2.0 | 4 September 2026 | In-portal submission. Path A (EcoVadis) split into two doors: attach scorecard with five headline fields, or fill the nine EcoVadis questions in-page. Path B (Full Assessment) split into two doors: a guided form stepping through S1–S7 and the declaration, or download the template, complete it offline, and upload it back for parsed review before submitting. Upload accepts only the official template, as `.xlsx` or its `.csv` export, validated on sheet name, column headers, and all thirty question texts. The download button moves inside Path B door two. Every door ends on a single on-screen confirmation; no email is sent. Data model moves D1 → D2 (session-only, nothing stored). Frontend moves flat HTML → React + Vite + Tailwind. Brand moves `the-corporate-brand` → `data-leaf-brand`. New "Go to step 1" button added at the foot of the hero, scrolling to the path chooser. Conditional rules added for PFAS and water stress. Three defects in the source template documented and handled. |
 
 ---
 
