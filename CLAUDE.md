@@ -24,7 +24,7 @@ Do not start the next piece of work before the save point is pushed. Never end a
 First Session Setup (session 1 only):
 1. Create docs/ and move the product spec into it as product-spec.md. It sits in the repo root under a different filename — confirm which file it is with the builder before renaming.
 2. Install the brand skill: create .claude/skills/data-leaf-brand/ and place the provided brand file there as SKILL.md.
-3. Create public/assets/ and move into it the questionnaire template, the Global Environmental Policy PDF, and the Supplier Code of Conduct PDF. Move every other reference document in the root into docs/ as background context — nothing in docs/ other than product-spec.md drives the build, so do not wire any of it into the UI. Confirm every filename by reading it off disk; never hardcode an unverified asset path.
+3. Create public/assets/ and move into it the questionnaire template, the Global Environmental Policy PDF, and the Supplier Code of Conduct PDF. Move every other reference document in the root into docs/ as background context — nothing in docs/ other than product-spec.md drives the build, so do not wire any of it into the UI. Confirm every filename by reading it off disk; never hardcode an unverified asset path. Move the v1.0 `index.html` to docs/v1-index.html before scaffolding — Vite claims the root `index.html` as its entry point, and the v1.0 file must not be overwritten or served.
 4. Announce what moved, then commit and push before building anything.
 
 PROGRESS.md structure (for the recreate rule): status header (Session / Last updated / Live URL), Current state, Last session (3–5 lines, replace each session), Remaining work (shrinking checklist), Build decisions (one line each), Known issues, Notes for next session.

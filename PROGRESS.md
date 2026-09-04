@@ -19,7 +19,7 @@ None — the first v2.0 build session has not happened yet.
 
 ## Remaining work
 - [ ] First Session Setup: create docs/ and public/assets/, move reference files, install the data-leaf-brand skill, commit (see CLAUDE.md Session Protocol)
-- [ ] Scaffold React + Vite + Tailwind + shadcn/ui, add SheetJS, retire the v1.0 static index.html
+- [ ] Archive v1.0 `index.html` to docs/, then scaffold React + Vite + Tailwind + shadcn/ui and add SheetJS
 - [ ] Build View 1 — landing page: nav, hero with stats and the new "Go to step 1" button, Why We Are Asking, Two Routes, What Happens Next timeline, Key Resources, footer
 - [ ] Draft the "Why We Are Asking" body copy in the Data Leaf voice — builder reviews before deployment
 - [ ] Build View 2 — Path A door chooser (EcoVadis: upload or enter details)
