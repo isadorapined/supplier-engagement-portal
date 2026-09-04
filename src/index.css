@@ -1,0 +1,47 @@
+@import './styles/tokens.css';
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html {
+    scroll-behavior: smooth;
+  }
+
+  body {
+    background-color: var(--dl-bg);
+    color: var(--dl-text);
+    font-family: var(--dl-font-body);
+    -webkit-font-smoothing: antialiased;
+  }
+
+  h1,
+  h2,
+  h3,
+  h4 {
+    font-family: var(--dl-font-heading);
+    font-weight: 500;
+    color: var(--dl-text);
+  }
+
+  /* Keyboard focus is visible everywhere, in Burnt Clay. */
+  :focus-visible {
+    outline: 2px solid var(--dl-cta);
+    outline-offset: 2px;
+  }
+}
+
+@layer utilities {
+  .font-stat {
+    font-family: var(--dl-font-heading);
+    font-weight: 500;
+    font-variant-numeric: tabular-nums;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+}
