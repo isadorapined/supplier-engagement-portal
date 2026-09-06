@@ -1,15 +1,15 @@
 import { useState } from 'react'
 import { Button } from '@/components/ui/Button'
 import { Card } from '@/components/ui/Card'
-import { Input, Textarea, Label } from '@/components/ui/Field'
+import { Input, Textarea, Label, QuestionMeta } from '@/components/ui/Field'
 import {
   FlowShell,
   SectionHeading,
   TransparencyNotice,
   ProblemList,
+  Notice,
 } from '@/components/Chrome'
 import Declaration from '@/components/Declaration'
-import PfasNotice from '@/components/PfasNotice'
 import FilePicker from '@/components/FilePicker'
 import { TEMPLATE_ROWS, SECTIONS, sectionById } from '@/lib/questions'
 import { parseTemplateFile } from '@/lib/parseTemplate'
@@ -118,7 +118,7 @@ export default function UploadReview({ state, update, onSubmit, onBack }) {
 
   return (
     <FlowShell>
-      <Button variant="ghost" size="sm" onClick={onBack} className="-ml-3">
+      <Button variant="back" size="sm" onClick={onBack} className="-ml-3">
         ← Back
       </Button>
 
@@ -131,10 +131,10 @@ export default function UploadReview({ state, update, onSubmit, onBack }) {
       {/* Step one — download */}
       <Card className="mt-8">
         <h3 className="font-heading text-lg font-medium">Step one — download the template</h3>
-        <p className="mt-3 max-w-prose font-body text-sm text-ink/80">
+        <p className="mt-3 max-w-prose font-body text-sm text-ink">
           Complete it with whoever needs to contribute, then come back to this page and upload it.
         </p>
-        <Button as="a" href={TEMPLATE_PATH} download className="mt-5 w-full sm:w-auto">
+        <Button variant="nav" as="a" href={TEMPLATE_PATH} download className="mt-5 w-full sm:w-auto">
           Download Assessment
         </Button>
       </Card>
@@ -142,7 +142,7 @@ export default function UploadReview({ state, update, onSubmit, onBack }) {
       {/* Step two — upload */}
       <Card className="mt-6">
         <h3 className="font-heading text-lg font-medium">Step two — upload the completed file</h3>
-        <p className="mt-3 max-w-prose font-body text-sm text-ink/80">
+        <p className="mt-3 max-w-prose font-body text-sm text-ink">
           Only the official template above is accepted. Upload the workbook itself, or its CSV
           export.
         </p>
@@ -162,14 +162,9 @@ export default function UploadReview({ state, update, onSubmit, onBack }) {
           />
         </div>
 
-        {error ? (
-          <p
-            role="alert"
-            className="mt-4 rounded-md border border-clay/40 bg-clay/5 px-4 py-3 font-body text-sm text-ink"
-          >
-            {error}
-          </p>
-        ) : null}
+        <Notice role="alert" className="mt-4">
+          {error}
+        </Notice>
       </Card>
 
       {reviewing ? (
@@ -179,7 +174,7 @@ export default function UploadReview({ state, update, onSubmit, onBack }) {
               title="Review your answers"
               lead="Everything we read from your file is below, grouped by section. Correct or complete anything before you submit."
             />
-            <p className="mt-3 font-body text-sm text-ink/70">
+            <p className="mt-3 font-body text-sm text-ink">
               {answered} of {UPLOAD_TOTAL} questions answered.
             </p>
           </div>
@@ -196,53 +191,41 @@ export default function UploadReview({ state, update, onSubmit, onBack }) {
                   </span>
                 </h3>
 
-                <div className="mt-4 overflow-x-auto rounded-lg border border-ink/10">
+                <div className="mt-4 overflow-x-auto rounded-lg bg-silver">
                   <table className="w-full min-w-[720px] border-collapse text-left">
                     <thead>
-                      <tr className="bg-silver">
-                        <th className="w-[40%] px-4 py-3 font-body text-xs font-semibold uppercase tracking-wide text-ink/70">
+                      <tr>
+                        <th className="w-[40%] px-4 py-3 font-body text-xs font-semibold uppercase tracking-wide text-ink">
                           Question / metric
                         </th>
-                        <th className="w-[32%] px-4 py-3 font-body text-xs font-semibold uppercase tracking-wide text-ink/70">
+                        <th className="w-[32%] px-4 py-3 font-body text-xs font-semibold uppercase tracking-wide text-ink">
                           Supplier response
                         </th>
-                        <th className="w-[28%] px-4 py-3 font-body text-xs font-semibold uppercase tracking-wide text-ink/70">
+                        <th className="w-[28%] px-4 py-3 font-body text-xs font-semibold uppercase tracking-wide text-ink">
                           Notes / evidence
                         </th>
                       </tr>
                     </thead>
                     <tbody>
-                      {rows.map((row, index) => {
+                      {rows.map((row) => {
                         const required = conditionallyRequired.has(row.id)
                         const empty = !isFilled(answers[row.id])
                         const AnswerControl = row.long ? Textarea : Input
                         return (
-                          <tr
-                            key={row.id}
-                            className={index % 2 === 1 ? 'bg-silver/45' : 'bg-mint'}
-                          >
-                            <td className="border-t border-ink/10 px-4 py-4 align-top">
-                              <div className="flex flex-wrap items-center gap-2">
-                                <span className="rounded bg-teal/10 px-2 py-0.5 font-body text-xs font-semibold uppercase tracking-wide text-teal">
-                                  {row.displayId}
-                                </span>
-                                <span className="font-body text-xs text-ink/60">
-                                  ESRS {row.esrs}
-                                </span>
-                              </div>
+                          <tr key={row.id}>
+                            <td className="border-t border-ink/15 px-4 py-4 align-top">
+                              <QuestionMeta id={row.displayId} esrs={row.esrs} />
                               <p className="mt-2 font-body text-sm text-ink">{row.templateText}</p>
                               {empty ? (
-                                <p className="mt-2 font-body text-xs font-medium text-clay">
-                                  Not answered
-                                </p>
+                                <p className="mt-2 font-body text-sm text-clay">Not answered</p>
                               ) : null}
                               {required ? (
-                                <p className="mt-1 font-body text-xs text-clay">
+                                <p className="mt-1 font-body text-sm text-clay">
                                   Required by your earlier answer
                                 </p>
                               ) : null}
                             </td>
-                            <td className="border-t border-ink/10 px-4 py-4 align-top">
+                            <td className="border-t border-ink/15 px-4 py-4 align-top">
                               <Label htmlFor={`r-${row.id}`} className="sr-only">
                                 {row.templateText}
                               </Label>
@@ -252,9 +235,9 @@ export default function UploadReview({ state, update, onSubmit, onBack }) {
                                 value={answers[row.id] ?? ''}
                                 onChange={(event) => setAnswer(row.id, event.target.value)}
                               />
-                              {row.id === 'S3-2' ? <PfasNotice text={pfas.notice} /> : null}
+                              {row.id === 'S3-2' ? <Notice className="mt-3">{pfas.notice}</Notice> : null}
                             </td>
-                            <td className="border-t border-ink/10 px-4 py-4 align-top">
+                            <td className="border-t border-ink/15 px-4 py-4 align-top">
                               <Label htmlFor={`rn-${row.id}`} className="sr-only">
                                 Notes and evidence
                               </Label>
@@ -287,10 +270,10 @@ export default function UploadReview({ state, update, onSubmit, onBack }) {
           <div className="mt-8 space-y-5">
             <TransparencyNotice />
             <div className="flex flex-col gap-3 sm:flex-row">
-              <Button size="lg" onClick={submit} className="w-full sm:w-auto">
+              <Button variant="submit" size="lg" onClick={submit} className="w-full sm:w-auto">
                 Submit
               </Button>
-              <Button size="lg" variant="outline" onClick={onBack} className="w-full sm:w-auto">
+              <Button size="lg" variant="back" onClick={onBack} className="w-full sm:w-auto">
                 Back
               </Button>
             </div>

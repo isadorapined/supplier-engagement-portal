@@ -1,6 +1,8 @@
 /** @type {import('tailwindcss').Config} */
 export default {
   content: ['./index.html', './src/**/*.{js,jsx}'],
+  // Spec 10.6: the timeline hover has no tap-state substitute on touch.
+  future: { hoverOnlyWhenSupported: true },
   theme: {
     extend: {
       colors: {

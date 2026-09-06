@@ -95,7 +95,7 @@ check('no cookies set', storage.cookies, '')
 
 await page.reload({ waitUntil: 'networkidle' })
 check('reload lands on a clean landing page',
-  await page.getByRole('heading', { name: 'Two Routes. One Destination.' }).isVisible(), true)
+  await page.getByRole('heading', { name: 'Step 1 — Choose a path.' }).isVisible(), true)
 check('no submission is retained after reload',
   await page.getByRole('heading', { name: 'Submission complete.' }).count(), 0)
 await page.getByRole('button', { name: 'Submit EcoVadis Scorecard' }).click()

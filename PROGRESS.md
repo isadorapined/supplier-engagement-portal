@@ -4,51 +4,60 @@
 > anything. Update it at every save point. Replace content — do not append.
 > History lives in git.
 
-**Session:** 1 — v2.0 built
-**Last updated:** 4 September 2026
+**Session:** 2 — v2.1 visual direction built
+**Last updated:** 6 September 2026
 **Live URL:** none yet [Rule: fill in after the first successful deploy]
 
 ## Current state
-v2.0 is built and passing its local test pass. React + Vite + Tailwind, deployed
-by pushing to main (`netlify.toml` sets the build command, publish directory, and
-the SPA redirect).
+v2.1 is built and passing the full local test pass — 28 parser checks and three
+browser suites, all green. React + Vite + Tailwind, deployed by pushing to main
+(`netlify.toml` sets the build command, publish directory, and the SPA redirect).
 
-All seven views are complete: the landing page (nav, hero with the four stats and
-the new "Go to step 1" button, Why We Are Asking, Two Routes, the four-step
-timeline, Key Resources, footer); both path choosers; the two EcoVadis doors; the
-eight-step guided assessment carrying all 33 fields with a notes field each; the
-download-and-upload door with its parser and editable review table; and the
-on-screen confirmation.
+Spec Section 10 is applied end to end. The hero is a full-width Deep Space Blue
+band — Silver overline, Mint Cream H1 and body, four rounded Silver stat cards
+with Deep Space Blue figures and labels, the Scope 3 note bare on the band, and
+a Burnt Clay "Go to step 1" beneath both. It is the only dark band on the page;
+a test asserts that count is exactly one.
 
-The upload parser applies spec 9.1's five checks in order, tolerates all three
-documented template defects, ignores column G, and prefills the declaration
-signatory when the file carries one. The conditional rules, submit gating, and
-answered-question count live in one module (`src/lib/rules.js`) shared by the
-guided form and the review table, so the two behave identically.
+"Why We Are Asking." carries its full stop, a Deep Teal overline, and three
+separated paragraphs on thick Deep Teal left borders directly on the Silver
+section. The v2.0 clipping and run-together are gone, and the test checks both.
+The path chooser reads "Step 1 — Choose a path."; the v2.0 wording appears
+nowhere in the build.
 
-Nothing is stored and nothing is sent. No `localStorage`, no `sessionStorage`, no
-cookies, no `fetch`, no form action — verified in a browser: no request leaves the
-page across a full submission, and a reload returns a clean landing page.
+All six choice cards render through one `ChoiceCard` component, so the Step 1
+path cards and the door cards in Views 2 and 4 cannot drift apart. Every form
+surface uses the same treatment: Silver container on a Mint Cream page, Mint
+Cream fields with a Deep Teal bottom border and nothing on the other three
+sides, no box shadow anywhere. Notices, validation, upload rejections, "Not
+answered", and the active progress step are all Burnt Clay body text with no
+panel and no icon.
 
-First Session Setup is done: `docs/` holds the spec, the retired v1.0 page as
-`v1-index.html`, and the three background documents; `public/assets/` holds the
-questionnaire template and the two policy PDFs; the brand skill is installed at
-`.claude/skills/data-leaf-brand/`.
+Nothing is stored and nothing is sent. No `localStorage`, no `sessionStorage`,
+no cookies, no `fetch`, no form action — re-verified this session: no request
+leaves the page across a full submission on any door, and a reload returns a
+clean landing page.
+
+The data model, access model, arms, views, question set, validation, and logic
+are untouched from v2.0. The parser suite passing unchanged is the evidence.
 
 ## Last session
-Ran First Session Setup, scaffolded the React build, and built all of spec
-Section 8. Derived the parser's thirty question texts by reading them off the
-shipped workbook rather than transcribing them. Wrote four test suites — a
-Node parser suite and three browser suites driven through Chromium — covering
-every one of the 23 acceptance criteria that can be checked before deployment.
-All pass.
+Applied the whole of spec Section 10. Rebuilt `Landing.jsx`; replaced the button
+variants with behavioural names (`submit` / `nav` / `back`) so 10.5 is enforced
+at every call site rather than remembered; moved the six choice cards onto one
+shared component; rewrote the field treatment to bottom-border-only; and
+stripped every notice panel back to Burnt Clay text. Extended `tests/ui.test.mjs`
+with computed-style checks for criteria 3, 4, 5, 6, 8, 9, 10, 11, 12, and 13.
+Deleted `PfasNotice.jsx` — one `Notice` in `Chrome.jsx` now covers every 10.6
+state.
 
 ## Remaining work
 - [ ] Builder reviews the "Why We Are Asking" body copy before deployment
-- [ ] Push to GitHub — blocked in the build session, see Known issues
+- [ ] Builder confirms or replaces the "PROGRAMME CONTEXT" overline wording
+- [ ] Builder reviews the light nav bar sitting above the dark hero band
 - [ ] Connect Netlify to the repo; confirm the live URL and record it above
-- [ ] Acceptance criterion 23 — verify the deployed site loads on desktop and
-      mobile with no 404s and the template downloads from the live URL
+- [ ] Criteria 34 and 35 on real devices — mobile layout and the deployed site
+      (no 404s, template downloads). Everything checkable pre-deploy is green.
 
 ## Build decisions
 - Session state is one object in `App.jsx`; views receive it plus an `update`
@@ -61,6 +70,32 @@ All pass.
 - shadcn/ui components are hand-written into `src/components/ui/` in the shadcn
   idiom (cva variants, a `cn` merge helper) rather than generated by the CLI,
   which needs interactive network access unavailable in the build session.
+- Button variants are named for behaviour, not colour — `submit` is Deep Teal,
+  `nav` is Burnt Clay, `back` is plain Deep Space Blue text. Spec 10.5 is a
+  behavioural rule, and naming the variants after the behaviour is what stops
+  "Submit EcoVadis Scorecard" from being coloured by its wording.
+- The six choice cards render through one `ChoiceCard` in `Chrome.jsx`. Spec
+  10.3 requires the path cards and both door choosers to be the same object;
+  one component is the cheapest way to guarantee it stays true.
+- Door chooser overlines read "Door one" / "Door two". Spec 10.3 asks for the
+  door name in the overline; using the door's own title there would repeat the
+  card heading verbatim, so the ordinal carries it and every Section 8 string
+  stays intact.
+- The "What Happens Next" section background moved from Silver to Mint Cream.
+  Spec 10.6 hovers each step to Silver, which is invisible on a Silver section.
+  The steps keep their v2.0 resting treatment; only the section behind them
+  changed. Flag at builder review if the intent was different.
+- `hoverOnlyWhenSupported` is set in `tailwind.config.js`, which is what
+  implements 10.6's "no tap-state substitute on touch" for the timeline.
+- Keyboard focus keeps the Burnt Clay `:focus-visible` outline from
+  `index.css`. 10.4's "no outline" governs the resting field, not focus —
+  removing the focus ring would make the form unusable by keyboard.
+- Body text is Deep Space Blue at full value throughout. The v2.0 build used
+  `text-ink/60` through `/85` in places, which criterion 33 asks about
+  directly.
+- Question ids carry a `data-qid` attribute. The tests read it instead of
+  matching on Tailwind classes, which is what broke them when the tinted id
+  chip was removed.
 - Question texts for the parser are copied verbatim off the workbook, trailing
   spaces and all. `src/lib/questions.js` says so at the top — never tidy them.
 - Upload-door gating adapts View 5's five S1 checks to the template's two
@@ -75,16 +110,17 @@ All pass.
   than the `#` the spec's open questions allow, since both files were supplied.
 
 ## Known issues
-- **Push to GitHub is blocked.** `git push` returns 403: "Claude doesn't have
-  GitHub access to isadorapined/supplier-engagement-portal for your
-  organization." Session 1's commits are on the local branch
-  `claude/supplier-engagement-portal-v2-7zf71l` and are not yet on the remote.
-  An org admin installs the Claude GitHub App, or the builder reconnects GitHub
-  under claude.ai Settings → Connectors. Netlify deployment waits on this.
 - No Data Leaf logo file. The wordmark renders as DM Sans Medium type in Deep
   Space Blue — flag for replacement if a logo arrives.
+- The nav bar sits directly above the dark hero band. It stays Mint Cream with
+  the Deep Space Blue wordmark; flag for builder review at first deploy.
+- The "Why We Are Asking." overline ships with the placeholder wording
+  "PROGRAMME CONTEXT" unless the builder replaces it.
 - "Why We Are Asking" body copy is drafted by Claude Code and needs builder
   review before the first deployment.
+- Criterion 10 (Key Resources punctuation) was already satisfied in the v2.0
+  build — the section closes "Everything you need." The H2 itself is left as
+  "Key Resources", which is how spec Section 8 writes it.
 - EcoVadis badge options ship as None / Committed / Other. The source file lists
   no options — confirm with The Corporate if it matters.
 - The three tolerated template defects are handled in the parser, not fixed in

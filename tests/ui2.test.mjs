@@ -44,7 +44,7 @@ const seen = []
 const notesCounts = []
 for (let step = 0; step < 7; step += 1) {
   const heading = await page.locator('h2').first().innerText()
-  const ids = await page.locator('span.rounded.bg-teal\\/10').allInnerTexts()
+  const ids = await page.locator('[data-qid]').evaluateAll((els) => els.map((el) => el.dataset.qid))
   seen.push({ heading, ids })
   notesCounts.push(await page.getByLabel('Notes / evidence').count())
   if (step === 0) {

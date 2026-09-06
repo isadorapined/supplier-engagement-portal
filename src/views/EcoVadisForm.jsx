@@ -32,7 +32,7 @@ export default function EcoVadisForm({ state, update, onSubmit, onBack }) {
 
   return (
     <FlowShell>
-      <Button variant="ghost" size="sm" onClick={onBack} className="-ml-3">
+      <Button variant="back" size="sm" onClick={onBack} className="-ml-3">
         ← Back
       </Button>
 
@@ -143,10 +143,10 @@ export default function EcoVadisForm({ state, update, onSubmit, onBack }) {
       <div className="mt-8 space-y-5">
         <TransparencyNotice />
         <div className="flex flex-col gap-3 sm:flex-row">
-          <Button size="lg" onClick={submit} className="w-full sm:w-auto">
+          <Button variant="submit" size="lg" onClick={submit} className="w-full sm:w-auto">
             Submit
           </Button>
-          <Button size="lg" variant="outline" onClick={onBack} className="w-full sm:w-auto">
+          <Button size="lg" variant="back" onClick={onBack} className="w-full sm:w-auto">
             Back
           </Button>
         </div>

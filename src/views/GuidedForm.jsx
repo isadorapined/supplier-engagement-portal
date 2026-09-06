@@ -1,15 +1,15 @@
 import { useState } from 'react'
 import { Button } from '@/components/ui/Button'
 import { Card } from '@/components/ui/Card'
-import { Input, Label, Textarea, Select, Hint } from '@/components/ui/Field'
+import { Input, Label, Textarea, Select, Hint, QuestionMeta } from '@/components/ui/Field'
 import {
   FlowShell,
   SectionHeading,
   TransparencyNotice,
   ProblemList,
+  Notice,
 } from '@/components/Chrome'
 import Declaration from '@/components/Declaration'
-import PfasNotice from '@/components/PfasNotice'
 import { SECTIONS, guidedFieldsFor } from '@/lib/questions'
 import {
   guidedProblems,
@@ -27,9 +27,9 @@ function ProgressIndicator({ step }) {
       <div className="flex flex-wrap items-baseline justify-between gap-2">
         <p className="font-body text-sm font-medium text-ink">
           Step {step + 1} of {TOTAL_STEPS}
-          <span className="ml-2 text-ink/60">{label}</span>
+          <span className="ml-2 font-normal">{label}</span>
         </p>
-        <p className="font-body text-xs text-ink/60">
+        <p className="font-body text-xs text-ink">
           {Math.round(((step + 1) / TOTAL_STEPS) * 100)}% through
         </p>
       </div>
@@ -37,7 +37,7 @@ function ProgressIndicator({ step }) {
         {Array.from({ length: TOTAL_STEPS }, (_, index) => (
           <span
             key={index}
-            className={`h-1.5 flex-1 rounded-full ${index <= step ? 'bg-clay' : 'bg-ink/15'}`}
+            className={`h-1.5 flex-1 rounded-full ${index === step ? 'bg-clay' : 'bg-silver'}`}
           />
         ))}
       </div>
@@ -93,7 +93,7 @@ export default function GuidedForm({ state, update, onSubmit, onBack }) {
   return (
     <FlowShell>
       <Button
-        variant="ghost"
+        variant="back"
         size="sm"
         onClick={step === 0 ? onBack : () => goToStep(step - 1)}
         className="-ml-3"
@@ -119,15 +119,19 @@ export default function GuidedForm({ state, update, onSubmit, onBack }) {
               const inputId = `q-${field.id}`
               return (
                 <Card key={field.id} tone="silver">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <span className="rounded bg-teal/10 px-2 py-0.5 font-body text-xs font-semibold uppercase tracking-wide text-teal">
-                      {field.id}
-                    </span>
-                    <span className="font-body text-xs text-ink/60">ESRS {field.esrs}</span>
-                    <span className="font-body text-xs text-ink/60">
-                      · {field.type === 'longtext' ? 'Open-ended' : field.type === 'select' ? 'Dropdown' : field.type === 'number' ? 'Quantitative' : 'Text'}
-                    </span>
-                  </div>
+                  <QuestionMeta
+                    id={field.id}
+                    esrs={field.esrs}
+                    kind={
+                      field.type === 'longtext'
+                        ? 'Open-ended'
+                        : field.type === 'select'
+                          ? 'Dropdown'
+                          : field.type === 'number'
+                            ? 'Quantitative'
+                            : 'Text'
+                    }
+                  />
 
                   <Label htmlFor={inputId} required={required} className="mt-3">
                     {field.label}
@@ -160,10 +164,10 @@ export default function GuidedForm({ state, update, onSubmit, onBack }) {
                     />
                   )}
 
-                  {field.id === 'S3-2' ? <PfasNotice text={pfas.notice} /> : null}
+                  {field.id === 'S3-2' ? <Notice className="mt-3">{pfas.notice}</Notice> : null}
 
                   <div className="mt-4">
-                    <Label htmlFor={`n-${field.id}`} className="text-ink/70">
+                    <Label htmlFor={`n-${field.id}`}>
                       Notes / evidence
                     </Label>
                     <Textarea
@@ -187,12 +191,12 @@ export default function GuidedForm({ state, update, onSubmit, onBack }) {
           ) : null}
 
           <div className="mt-10 flex flex-col gap-3 sm:flex-row">
-            <Button size="lg" onClick={() => goToStep(step + 1)} className="w-full sm:w-auto">
+            <Button variant="nav" size="lg" onClick={() => goToStep(step + 1)} className="w-full sm:w-auto">
               Next
             </Button>
             <Button
               size="lg"
-              variant="outline"
+              variant="back"
               onClick={step === 0 ? onBack : () => goToStep(step - 1)}
               className="w-full sm:w-auto"
             >
@@ -218,12 +222,12 @@ export default function GuidedForm({ state, update, onSubmit, onBack }) {
           <div className="mt-8 space-y-5">
             <TransparencyNotice />
             <div className="flex flex-col gap-3 sm:flex-row">
-              <Button size="lg" onClick={submit} className="w-full sm:w-auto">
+              <Button variant="submit" size="lg" onClick={submit} className="w-full sm:w-auto">
                 Submit
               </Button>
               <Button
                 size="lg"
-                variant="outline"
+                variant="back"
                 onClick={() => goToStep(step - 1)}
                 className="w-full sm:w-auto"
               >

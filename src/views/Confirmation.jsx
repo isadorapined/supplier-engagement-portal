@@ -84,7 +84,7 @@ export default function Confirmation({ state, onRestart }) {
         <dl className="divide-y divide-ink/10">
           {rows.map((row) => (
             <div key={row.label} className="grid gap-1 py-3 sm:grid-cols-3 sm:gap-4">
-              <dt className="font-body text-sm text-ink/60">{row.label}</dt>
+              <dt className="font-body text-sm text-ink">{row.label}</dt>
               <dd className="font-body text-sm text-ink sm:col-span-2 sm:break-words">
                 {row.value}
               </dd>
@@ -99,7 +99,7 @@ export default function Confirmation({ state, onRestart }) {
 
       <Card tone="silver" className="mt-8">
         <h3 className="font-heading text-lg font-medium">What happens next</h3>
-        <p className="mt-3 max-w-prose font-body text-sm text-ink/80">
+        <p className="mt-3 max-w-prose font-body text-sm text-ink">
           The submission window closes on 30 September 2026. Our EHS and Procurement teams review
           every submission and return to prioritised suppliers with joint improvement plans in Q1
           2027. For questions about ESRS requirements or measurement methodology, contact the{' '}
@@ -114,7 +114,7 @@ export default function Confirmation({ state, onRestart }) {
       </Card>
 
       <div className="mt-10">
-        <Button size="lg" onClick={onRestart} className="w-full sm:w-auto">
+        <Button variant="nav" size="lg" onClick={onRestart} className="w-full sm:w-auto">
           Start another submission
         </Button>
       </div>

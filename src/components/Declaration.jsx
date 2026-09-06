@@ -9,7 +9,7 @@ export default function Declaration({ declaration, onChange }) {
     <Card className="space-y-6">
       <div>
         <h3 className="font-heading text-lg font-medium">Declaration</h3>
-        <p className="mt-3 max-w-prose font-body text-sm text-ink/80">{DECLARATION_TEXT}</p>
+        <p className="mt-3 max-w-prose font-body text-sm text-ink">{DECLARATION_TEXT}</p>
       </div>
 
       <div className="grid gap-5 sm:grid-cols-2">

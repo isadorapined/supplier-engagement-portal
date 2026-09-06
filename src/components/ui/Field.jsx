@@ -1,7 +1,12 @@
 import { cn } from '@/lib/utils'
 
+// Spec 10.4 — the defining detail of the form treatment. Mint Cream field,
+// Deep Teal rule underneath, and nothing on the other three sides. Do not add
+// a full border, an outline, or a box shadow here: the contrast between the
+// Mint Cream field and the Silver container is what makes the field visible.
+// Keyboard focus is still marked, by the :focus-visible rule in index.css.
 const control =
-  'w-full rounded-md border border-ink/25 bg-mint px-3 py-2 font-body text-sm text-ink placeholder:text-ink/40 focus:border-clay focus:outline-none focus:ring-1 focus:ring-clay'
+  'w-full rounded-none border-0 border-b-2 border-teal bg-mint px-3 py-2 font-body text-sm text-ink placeholder:text-ink/45'
 
 export function Label({ className, required, children, ...props }) {
   return (
@@ -38,7 +43,7 @@ export function Checkbox({ className, label, ...props }) {
     <label className="flex cursor-pointer items-start gap-3 font-body text-sm text-ink">
       <input
         type="checkbox"
-        className={cn('mt-0.5 h-4 w-4 shrink-0 accent-[#B35634]', className)}
+        className={cn('mt-0.5 h-4 w-4 shrink-0 accent-[#37663E]', className)}
         {...props}
       />
       <span>{label}</span>
@@ -47,5 +52,17 @@ export function Checkbox({ className, label, ...props }) {
 }
 
 export function Hint({ children, className }) {
-  return <p className={cn('font-body text-xs text-ink/60', className)}>{children}</p>
+  return <p className={cn('font-body text-xs text-ink', className)}>{children}</p>
+}
+
+// The ESRS reference and question id that sit beside a question. Deep Teal,
+// small, uppercase, tracked — no chip, no tint.
+export function QuestionMeta({ id, esrs, kind }) {
+  return (
+    <p data-qid={id} className="font-body text-xs font-semibold uppercase tracking-[0.12em] text-teal">
+      {id}
+      {esrs && esrs !== '—' ? <span className="ml-2 font-normal">ESRS {esrs}</span> : null}
+      {kind ? <span className="ml-2 font-normal">· {kind}</span> : null}
+    </p>
+  )
 }
