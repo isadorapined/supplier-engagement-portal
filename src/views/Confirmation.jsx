@@ -1,10 +1,10 @@
 import { Button } from '@/components/ui/Button'
 import { Card } from '@/components/ui/Card'
 import { FlowShell, SectionHeading, TransparencyNotice } from '@/components/Chrome'
-import { GUIDED_IDS, TEMPLATE_ROWS } from '@/lib/questions'
+import { GUIDED_IDS, UPLOAD_IDS } from '@/lib/questions'
 import { ECOVADIS_IDS } from '@/lib/ecovadis'
 import { countAnswered, GUIDED_TOTAL, UPLOAD_TOTAL, ECOVADIS_TOTAL } from '@/lib/rules'
-import { formatTimestamp, formatDateValue, findEmail } from '@/lib/format'
+import { formatTimestamp, formatDateValue } from '@/lib/format'
 
 const HELP_DESK =
   'mailto:sustainability@thecorporate.com?subject=Supplier%20Portal%20Help%20Desk%20Query'
@@ -18,8 +18,11 @@ const DOOR_LABEL = {
 
 const dash = (value) => (value && String(value).trim() ? String(value).trim() : '—')
 
-// Spec 9.4 — the summary block. Every line is read back off the session state,
-// so it reflects what was actually entered.
+// Spec 9.4 — the summary block.
+//
+// Read entirely off in-browser session state, never from the database: the
+// `submissions` RLS policy is insert-only, so there is nothing to read back.
+// The values shown here are the values that were just written.
 function buildRows(state) {
   const rows = []
   const { path, door, identity, ecovadisAnswers, assessmentAnswers, declaration } = state
@@ -30,12 +33,16 @@ function buildRows(state) {
   })
   rows.push({ label: 'Door', value: DOOR_LABEL[`${path}:${door}`] ?? '—' })
 
-  if (path === 'ecovadis') {
-    rows.push({ label: 'Company legal name', value: dash(identity.company) })
-    rows.push({ label: 'Contact email', value: dash(identity.contactEmail) })
+  // Identity now comes from one place for every door — the Company & Contact
+  // step — rather than from each door's own fields or the template's S1 rows.
+  rows.push({ label: 'Company legal name', value: dash(identity.company) })
+  rows.push({ label: 'Registered country', value: dash(identity.registeredCountry) })
+  rows.push({ label: 'Contact email', value: dash(identity.contactEmail) })
 
+  if (path === 'ecovadis') {
     if (door === 'upload') {
-      // No count for this door — the five headline fields are listed instead.
+      // Spec 9.4 — no count for this door. The three headline fields and the
+      // attached filename are listed instead.
       rows.push({ label: 'Contact name', value: dash(identity.contactName) })
       rows.push({ label: 'Contact title', value: dash(identity.contactTitle) })
       rows.push({ label: 'Publication date', value: dash(formatDateValue(ecovadisAnswers.Q1)) })
@@ -50,13 +57,10 @@ function buildRows(state) {
     }
   } else {
     const isUpload = door === 'upload'
-    const company = isUpload ? assessmentAnswers['T1'] : assessmentAnswers['S1-1']
-    const email = isUpload ? findEmail(assessmentAnswers['T2']) : assessmentAnswers['S1-5']
-    const ids = isUpload ? TEMPLATE_ROWS.map((row) => row.id) : GUIDED_IDS
+    // Both Path B doors count the same 28 S2–S7 questions (spec 9.4).
+    const ids = isUpload ? UPLOAD_IDS : GUIDED_IDS
     const total = isUpload ? UPLOAD_TOTAL : GUIDED_TOTAL
 
-    rows.push({ label: 'Company legal name', value: dash(company) })
-    rows.push({ label: 'Contact email', value: dash(email) })
     rows.push({
       label: 'Questions answered',
       value: `${countAnswered(assessmentAnswers, ids)} of ${total}`,

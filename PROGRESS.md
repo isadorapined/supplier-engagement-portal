@@ -4,165 +4,171 @@
 > anything. Update it at every save point. Replace content — do not append.
 > History lives in git.
 
-**Session:** 2 — v2.1 visual direction built
-**Last updated:** 6 September 2026
+**Session:** 3 — v3.0 built: Supabase persistence and the universal Company & Contact step
+**Last updated:** 11 September 2026
 **Live URL:** none yet [Rule: fill in after the first successful deploy]
 
 ## Current state
-v2.1 is built and passing the full local test pass — 28 parser checks and three
-browser suites, all green. React + Vite + Tailwind, deployed by pushing to main
-(`netlify.toml` sets the build command, publish directory, and the SPA redirect).
+v3.0 is built and passing the full local test pass — 49 parser checks and three
+browser suites, all green. The tool is now Tier 2: every completed submission
+is written to Supabase and linked to a reusable company record.
 
-Spec Section 10 is applied end to end. The hero is a full-width Deep Space Blue
-band — Silver overline, Mint Cream H1 and body, four rounded Silver stat cards
-with Deep Space Blue figures and labels, the Scope 3 note bare on the band, and
-a Burnt Clay "Go to step 1" beneath both. It is the only dark band on the page;
-a test asserts that count is exactly one.
+Database is live in the **existing** Supabase project "The Corporate"
+(`smnrfopzzzhazkehcqqn`, us-east-1, Free). `companies` and `submissions` are
+built with RLS on both. `companies` carries **no anon policy at all** — supplier
+contact details cannot be read from the browser — and all access to it goes
+through `resolve_company()`, a `SECURITY DEFINER` function that does the
+match-or-insert server-side and returns only a company id. `submissions` is
+insert-only. Every one of those restrictions was verified by querying as the
+anon role: companies returns 0 rows with rows present, a direct insert is
+refused, and anon delete/update affect nothing. docs/supabase-setup.md is the
+schema source of truth.
 
-"Why We Are Asking." carries its full stop, a Deep Teal overline, and three
-separated paragraphs on thick Deep Teal left borders directly on the Silver
-section. The v2.0 clipping and run-together are gone, and the test checks both.
-The path chooser reads "Step 1 — Choose a path."; the v2.0 wording appears
-nowhere in the build.
+All four doors open with the same five-field Company & Contact step, rendered
+from one `CompanyContact` component and gated by one `identityProblems()` — so
+criteria 2 and 3 hold by construction rather than by repetition. "S1" is gone as
+a numbered section: the guided form is eight steps (Company & Contact, S2–S7,
+Declaration), the parser reads 28 rows instead of 30, and both Path B
+denominators are 28. View 3a's step 2 is exactly three fields plus the file
+picker; View 3b's is exactly Q1–Q9.
 
-All six choice cards render through one `ChoiceCard` component, so the Step 1
-path cards and the door cards in Views 2 and 4 cannot drift apart. Every form
-surface uses the same treatment: Silver container on a Mint Cream page, Mint
-Cream fields with a Deep Teal bottom border and nothing on the other three
-sides, no box shadow anywhere. Notices, validation, upload rejections, "Not
-answered", and the active progress step are all Burnt Clay body text with no
-panel and no icon.
+The transparency notice now reads "Your information is stored for The
+Corporate's review." It changed in the same commit that added the database
+write, because either alone makes it false.
 
-Nothing is stored and nothing is sent. No `localStorage`, no `sessionStorage`,
-no cookies, no `fetch`, no form action — re-verified this session: no request
-leaves the page across a full submission on any door, and a reload returns a
-clean landing page.
-
-The data model, access model, arms, views, question set, validation, and logic
-are untouched from v2.0. The parser suite passing unchanged is the evidence.
+Files are still never stored — only filename and size reach the database. The
+browser suites now assert that on the request bodies themselves, since the old
+"no request leaves the page" assertion stopped being true this version.
 
 ## Last session
-Applied the whole of spec Section 10. Rebuilt `Landing.jsx`; replaced the button
-variants with behavioural names (`submit` / `nav` / `back`) so 10.5 is enforced
-at every call site rather than remembered; moved the six choice cards onto one
-shared component; rewrote the field treatment to bottom-border-only; and
-stripped every notice panel back to Burnt Clay text. Extended `tests/ui.test.mjs`
-with computed-style checks for criteria 3, 4, 5, 6, 8, 9, 10, 11, 12, and 13.
-Deleted `PfasNotice.jsx` — one `Notice` in `Chrome.jsx` now covers every 10.6
-state.
+Audited the repo before building and found the v3.0 spec sitting in the repo
+root while docs/product-spec.md still held v2.1 — CLAUDE.md pointed at the stale
+one, and its version tripwire only fired on *newer* specs, so it would have
+passed straight over it. Moved v3.0 into docs/, kept v2.1 as
+docs/product-spec-v2.1.md (v3.0 cites it as binding for View 1 and all of
+Section 10), and made the tripwire fire on any mismatch. Found a Supabase
+project already existed; builder confirmed reusing it. Corrected the spec's
+three "no RLS needed" claims, added the missing submit-failure path as §9.5, and
+fixed §10's subsection list and View 6's back-navigation. Then built the
+database, the shared step, the submit layer, and the failure path.
 
 ## Remaining work
+- [ ] **Builder: set `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` in the
+      Netlify dashboard before the first deploy.** Without them every submit
+      fails with the save-failure notice. Values are in docs/supabase-setup.md.
+- [ ] Connect Netlify to the repo; confirm the live URL and record it above
+- [ ] Criterion 20 on the deployed site — submissions made live appear in the
+      Supabase table editor; template downloads; no 404s
+- [ ] Criterion 19 on real devices — mobile layout end to end
+- [ ] Run `tests/persistence.test.mjs` with a service role key from an
+      unproxied machine (this session's environment blocks the Supabase host,
+      so the live HTTP round trip is the one thing not yet exercised)
 - [ ] Builder reviews the "Why We Are Asking" body copy before deployment
 - [ ] Builder confirms or replaces the "PROGRAMME CONTEXT" overline wording
 - [ ] Builder reviews the light nav bar sitting above the dark hero band
-- [ ] Connect Netlify to the repo; confirm the live URL and record it above
-- [ ] Criteria 34 and 35 on real devices — mobile layout and the deployed site
-      (no 404s, template downloads). Everything checkable pre-deploy is green.
-- [ ] Confirm the Supabase project name "the-corporate-supplier-portal" with the
-      builder, then create it via MCP (v3.0 revision)
-- [ ] Build the `companies` and `submissions` tables and RLS policies from
-      CLAUDE.md, then write docs/supabase-setup.md (v3.0 revision)
-- [ ] Build the shared Company & Contact step (5 fields) and reuse it as the
-      first step in Views 3a, 3b, 5, and 6 (v3.0 revision)
-- [ ] Remove the identity fields previously inside those views; retire "S1" as
-      a numbered section in View 5 and View 6 (v3.0 revision)
-- [ ] Add the "registered country" field to Views 3a and 3b, matching Step 1
-      elsewhere (v3.0 revision)
-- [ ] Build the submit logic: insert-or-update-on-match on `companies` by
-      legal_name, then insert the door's `submissions` row (v3.0 revision)
-- [ ] Update View 7's summary and denominators — 28 for View 5/6, 9 for
-      View 3b, no count for View 3a (v3.0 revision)
-- [ ] Update the transparency notice copy to "Your information is stored for
-      The Corporate's review." above every submit control and on View 7
-      (v3.0 revision)
-- [ ] Test locally, including a repeat submission with the same company name
-      to confirm the company record is reused, not duplicated (v3.0 revision)
-- [ ] Visual QA pass against acceptance criteria 1, 2, 10, 16, and 19
-      (v3.0 revision)
-- [ ] Acceptance criteria pass — verify all 20 criteria in spec Section 13
-      before deploy (v3.0 revision)
+- [ ] Confirm whether the supplier-facing wordmark should stay "Data Leaf" or
+      become The Corporate's — the footer already reads "© 2026 The Corporate"
 
 ## Build decisions
+- Reused the existing Supabase project "The Corporate" rather than creating
+  `the-corporate-supplier-portal`. It was already there and empty, and its name
+  fits spec §4's own rationale — named for the client context so it can hold
+  future tools — better than the proposed name did.
+- `companies` has RLS on and no policy, instead of the anon `select` CLAUDE.md
+  originally specified. The select would have exposed every supplier's contact
+  name, title and email to anyone with the portal URL. A `SECURITY DEFINER`
+  function closes that and also makes matching atomic, which a client-side
+  select-then-insert cannot: a unique index on `lower(btrim(legal_name))` means
+  two simultaneous submissions from one company cannot both insert.
+- Submit is async and gated by a ref, not by state. The ref is read before any
+  re-render, so a double-click cannot produce two `submissions` rows; the
+  `saving` flag in state only drives the disabled button.
+- View 7 renders from in-browser state, never a read-back. `submissions` is
+  insert-only, so `.insert().select()` is refused by the policy.
+- Notes travel inside `answers` as `<id>__notes` rather than in a second
+  column. One JSON object holds a door's whole answer set, and the notes can
+  never drift away from their question.
+- `answers` is filtered to the submitting door's own ids, so a door the
+  supplier opened, typed into, and backed out of leaves nothing behind.
 - Session state is one object in `App.jsx`; views receive it plus an `update`
   function. No state library, no router — spec Section 8 rules out multi-URL
   routing.
-- Answer keys are shared between doors. The 28 non-S1 questions use the guided
-  field ids (`S2-1` … `S7-5`) in both the guided form and the upload review, so
-  the 9.2 conditionals need no per-door special-casing. The template's two
-  combined S1 rows use their own keys, `T1` and `T2`.
+- Answer keys are shared between doors. The 28 questions use the guided field
+  ids (`S2-1` … `S7-5`) in both the guided form and the upload review, so the
+  9.2 conditionals need no per-door special-casing. The template's two S1 rows
+  and their `T1`/`T2` keys are gone entirely — the parser skips those rows.
+- The identity field list lives in `questions.js` beside the `resolve_company`
+  argument names, so the form and the database call cannot drift apart.
 - shadcn/ui components are hand-written into `src/components/ui/` in the shadcn
   idiom (cva variants, a `cn` merge helper) rather than generated by the CLI,
   which needs interactive network access unavailable in the build session.
 - Button variants are named for behaviour, not colour — `submit` is Deep Teal,
-  `nav` is Burnt Clay, `back` is plain Deep Space Blue text. Spec 10.5 is a
-  behavioural rule, and naming the variants after the behaviour is what stops
-  "Submit EcoVadis Scorecard" from being coloured by its wording.
+  `nav` is Burnt Clay, `back` is plain Deep Space Blue text. The Company &
+  Contact step's "Next" is `nav`: it navigates, it does not submit.
 - The six choice cards render through one `ChoiceCard` in `Chrome.jsx`. Spec
-  10.3 requires the path cards and both door choosers to be the same object;
-  one component is the cheapest way to guarantee it stays true.
-- Door chooser overlines read "Door one" / "Door two". Spec 10.3 asks for the
-  door name in the overline; using the door's own title there would repeat the
-  card heading verbatim, so the ordinal carries it and every Section 8 string
-  stays intact.
+  10.3 requires the path cards and both door choosers to be the same object.
+- Door chooser overlines read "Door one" / "Door two".
 - The "What Happens Next" section background moved from Silver to Mint Cream.
-  Spec 10.6 hovers each step to Silver, which is invisible on a Silver section.
-  The steps keep their v2.0 resting treatment; only the section behind them
-  changed. Flag at builder review if the intent was different.
-- `hoverOnlyWhenSupported` is set in `tailwind.config.js`, which is what
-  implements 10.6's "no tap-state substitute on touch" for the timeline.
+- `hoverOnlyWhenSupported` is set in `tailwind.config.js`, which implements
+  10.6's "no tap-state substitute on touch" for the timeline.
 - Keyboard focus keeps the Burnt Clay `:focus-visible` outline from
-  `index.css`. 10.4's "no outline" governs the resting field, not focus —
-  removing the focus ring would make the form unusable by keyboard.
-- Body text is Deep Space Blue at full value throughout. The v2.0 build used
-  `text-ink/60` through `/85` in places, which criterion 33 asks about
-  directly.
-- Question ids carry a `data-qid` attribute. The tests read it instead of
-  matching on Tailwind classes, which is what broke them when the tinted id
-  chip was removed.
+  `index.css`. 10.4's "no outline" governs the resting field, not focus.
+- Question ids carry a `data-qid` attribute and identity fields a
+  `data-identity` attribute. The tests read those instead of matching on
+  Tailwind classes.
 - Question texts for the parser are copied verbatim off the workbook, trailing
   spaces and all. `src/lib/questions.js` says so at the top — never tidy them.
-- Upload-door gating adapts View 5's five S1 checks to the template's two
-  combined cells: both rows must be filled and the contact row must contain a
-  valid email address, which the confirmation screen then reads back.
 - SheetJS is a lazy `import()` inside the parser, so the 429 kB chunk is only
   fetched when a supplier actually opens the upload door.
-- `.xlsx` uploads are checked for a ZIP signature before parsing. SheetJS sniffs
-  arbitrary bytes into an empty sheet instead of throwing, which would have let a
-  corrupt file fall through check 2 into check 3's wrong error message.
-- "View Document" and "View Policy" point at the two PDFs in `/assets/` rather
-  than the `#` the spec's open questions allow, since both files were supplied.
+- `.xlsx` uploads are checked for a ZIP signature before parsing.
+- The browser suites stub the two Supabase calls rather than hitting the
+  database, so they stay offline and deterministic — and criterion 11 is now
+  checked on the request bodies, which is stronger than the old request count.
 
 ## Known issues
+- **The live HTTP round trip to Supabase is unverified.** This session's
+  environment blocks `smnrfopzzzhazkehcqqn.supabase.co`, so every layer was
+  tested but not joined end to end over the wire: the SQL was exercised as the
+  anon role through MCP, and the exact request payloads `submit.js` builds were
+  captured with the network stubbed and replayed against the database verbatim.
+  Both halves pass. Run `tests/persistence.test.mjs` from an unproxied machine,
+  or make one live submission after deploying, to close it.
+- Free plan pauses after roughly a week without traffic, and a paused project
+  refuses writes. Suppliers would see the save-failure notice. Most likely real
+  cause of a failed submission.
 - No Data Leaf logo file. The wordmark renders as DM Sans Medium type in Deep
   Space Blue — flag for replacement if a logo arrives.
-- The nav bar sits directly above the dark hero band. It stays Mint Cream with
-  the Deep Space Blue wordmark; flag for builder review at first deploy.
+- The nav bar sits directly above the dark hero band; builder review pending.
 - The "Why We Are Asking." overline ships with the placeholder wording
   "PROGRAMME CONTEXT" unless the builder replaces it.
 - "Why We Are Asking" body copy is drafted by Claude Code and needs builder
   review before the first deployment.
-- Criterion 10 (Key Resources punctuation) was already satisfied in the v2.0
-  build — the section closes "Everything you need." The H2 itself is left as
-  "Key Resources", which is how spec Section 8 writes it.
 - EcoVadis badge options ship as None / Committed / Other. The source file lists
   no options — confirm with The Corporate if it matters.
 - The three tolerated template defects are handled in the parser, not fixed in
   the shipped `.xlsx`. If the template is ever corrected, the `templateText`
   strings in `src/lib/questions.js` must be updated to match.
-- `xlsx@0.18.5` is the newest build on the npm registry and carries two open
-  advisories. SheetJS's fixed 0.20.x is served only from `cdn.sheetjs.com`, which
-  the build session's proxy blocks. Exposure is limited: parsing runs on a file
-  the visitor chose themselves, the 10 MB cap is applied before any parse, and
-  `sheet_to_json` is called with `header: 1`, which returns arrays rather than
-  objects keyed by file content. Worth revisiting from an unproxied machine.
+- The shipped template still contains its two S1 rows. They are simply not read
+  any more. The template is not reissued, so a supplier completing it offline
+  will still fill in identity cells that the portal ignores in favour of the
+  Company & Contact step. Worth reissuing the workbook at some point.
+- `xlsx@0.18.5` is still the newest build on the npm registry (re-checked this
+  session: `latest` resolves to 0.18.5) and carries two open advisories.
+  SheetJS's fixed 0.20.x is served only from `cdn.sheetjs.com`, which the build
+  environment blocks. Exposure is limited: parsing runs on a file the visitor
+  chose themselves, the 10 MB cap is applied before any parse, and
+  `sheet_to_json` is called with `header: 1`. Worth revisiting from an
+  unproxied machine.
 - The v1.0 template row 18 carries an internal note in its NOTES / EVIDENCE cell
   ("AUTO-FLAG: Yes triggers PFAS Risk review"). It parses as that question's
-  notes and shows in the review table, which is correct behaviour for a notes
-  column but reads oddly. Fixing it means fixing the shipped template.
-- Spec revised to v3.0 on 10 September 2026 — CLAUDE.md regenerated by Project
-  Governor. The tool moves from D2 (session-only) to D3 (Supabase-persisted),
-  Tier 1 to Tier 2; see CLAUDE.md for the new Supabase, Hard Rules, and
-  Business Rules sections.
+  notes and shows in the review table.
+- Supabase's linter reports two findings — `rls_enabled_no_policy` on
+  `companies` (INFO) and `anon_security_definer_function_executable` on
+  `resolve_company` (WARN). Both are intentional and are the design working.
+  See docs/supabase-setup.md before "fixing" either.
+- Playwright 1.63 expects a Chromium build newer than the one installed in the
+  build environment. The browser suites need
+  `CHROME_PATH=/opt/pw-browsers/chromium-1194/chrome-linux/chrome`.
 
 ## Notes for next session
 None.

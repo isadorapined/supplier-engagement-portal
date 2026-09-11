@@ -3,17 +3,25 @@ import { Button } from '@/components/ui/Button'
 import { Card } from '@/components/ui/Card'
 import { Input, Label } from '@/components/ui/Field'
 import FilePicker from '@/components/FilePicker'
+import CompanyContact from '@/components/CompanyContact'
 import {
   FlowShell,
+  Notice,
   SectionHeading,
   TransparencyNotice,
   ProblemList,
 } from '@/components/Chrome'
-import { ecovadisUploadProblems } from '@/lib/rules'
+import { ecovadisUploadProblems, identityProblems } from '@/lib/rules'
 
-// View 3a — Path A door one.
+// View 3a — Path A door one. Two steps in v3.0: the universal Company &
+// Contact step, then the scorecard details. The four identity fields that
+// used to sit inside this door's own form have moved to Step 1, which is what
+// acceptance criterion 10 checks — Step 2 has exactly three fields plus the
+// file picker.
 export default function EcoVadisUpload({ state, update, onSubmit, onBack }) {
+  const [step, setStep] = useState(1)
   const [problems, setProblems] = useState([])
+  const [showIdentityProblems, setShowIdentityProblems] = useState(false)
 
   const identity = state.identity
   const answers = state.ecovadisAnswers
@@ -25,85 +33,65 @@ export default function EcoVadisUpload({ state, update, onSubmit, onBack }) {
   const setAnswer = (key, value) =>
     update((draft) => ({ ...draft, ecovadisAnswers: { ...draft.ecovadisAnswers, [key]: value } }))
 
+  const next = () => {
+    const found = identityProblems(identity)
+    setShowIdentityProblems(true)
+    if (found.length === 0) {
+      setShowIdentityProblems(false)
+      setStep(2)
+      window.scrollTo({ top: 0 })
+    }
+  }
+
   const submit = () => {
     const found = ecovadisUploadProblems(identity, answers, file)
     setProblems(found)
     if (found.length === 0) onSubmit()
   }
 
+  if (step === 1) {
+    return (
+      <FlowShell>
+        <CompanyContact
+          identity={identity}
+          onChange={setIdentity}
+          onNext={next}
+          onBack={onBack}
+          breadcrumb="Path A · Door one"
+          stepLabel="Step 1 of 2"
+          problems={identityProblems(identity)}
+          showProblems={showIdentityProblems}
+        />
+      </FlowShell>
+    )
+  }
+
   return (
     <FlowShell>
-      <Button variant="back" size="sm" onClick={onBack} className="-ml-3">
-        ← Back
-      </Button>
+      <p className="font-body text-xs font-semibold uppercase tracking-[0.18em] text-clay">
+        Path A · Door one
+      </p>
 
       <SectionHeading
-        overline="Path A · Door one"
+        className="mt-4"
         title="Upload your scorecard"
-        lead="Attach your EcoVadis scorecard and confirm the headline details. The file stays in your browser — we read the values you type below, not the document."
-        className="mt-6"
+        lead="Attach your EcoVadis scorecard and confirm the headline details. The file stays in your browser — we record its name and size, and read the values you type below, never the document itself."
       />
+
+      <p className="mt-4 font-body text-sm text-ink">Step 2 of 2</p>
 
       <Card className="mt-8 space-y-6">
         <FilePicker
           accept="application/pdf,.pdf"
           file={file}
           label="Attach your EcoVadis scorecard (PDF)"
-          hint="Held in your browser. Never read or uploaded."
+          hint="Held in your browser. Never read or uploaded — only its name and size are recorded."
           onSelect={(selected) => update((draft) => ({ ...draft, ecovadisFile: selected }))}
           onRemove={() => update((draft) => ({ ...draft, ecovadisFile: null }))}
         />
 
+        {/* Exactly three fields — identity lives in Step 1 (criterion 10). */}
         <div className="grid gap-5 sm:grid-cols-2">
-          <div className="sm:col-span-2">
-            <Label htmlFor="ev-company" required>
-              Company legal name
-            </Label>
-            <Input
-              id="ev-company"
-              className="mt-2"
-              value={identity.company}
-              onChange={(event) => setIdentity('company', event.target.value)}
-            />
-          </div>
-
-          <div>
-            <Label htmlFor="ev-name" required>
-              Primary contact name
-            </Label>
-            <Input
-              id="ev-name"
-              className="mt-2"
-              value={identity.contactName}
-              onChange={(event) => setIdentity('contactName', event.target.value)}
-            />
-          </div>
-
-          <div>
-            <Label htmlFor="ev-title" required>
-              Primary contact title
-            </Label>
-            <Input
-              id="ev-title"
-              className="mt-2"
-              value={identity.contactTitle}
-              onChange={(event) => setIdentity('contactTitle', event.target.value)}
-            />
-          </div>
-
-          <div className="sm:col-span-2">
-            <Label htmlFor="ev-email" required>
-              Primary contact email
-            </Label>
-            <Input
-              id="ev-email"
-              type="email"
-              className="mt-2"
-              value={identity.contactEmail}
-              onChange={(event) => setIdentity('contactEmail', event.target.value)}
-            />
-          </div>
-
           <div>
             <Label htmlFor="ev-published" required>
               Publication date
@@ -151,11 +139,25 @@ export default function EcoVadisUpload({ state, update, onSubmit, onBack }) {
 
       <div className="mt-8 space-y-5">
         <TransparencyNotice />
+        {/* Spec 9.5 — a failed write never reaches View 7. */}
+        <Notice role="alert">{state.saveError}</Notice>
         <div className="flex flex-col gap-3 sm:flex-row">
-          <Button variant="submit" size="lg" onClick={submit} className="w-full sm:w-auto">
-            Submit
+          <Button
+            variant="submit"
+            size="lg"
+            onClick={submit}
+            disabled={state.saving}
+            className="w-full sm:w-auto"
+          >
+            {state.saving ? 'Saving…' : 'Submit'}
           </Button>
-          <Button size="lg" variant="back" onClick={onBack} className="w-full sm:w-auto">
+          {/* Back returns to Step 1, not out of the door. */}
+          <Button
+            size="lg"
+            variant="back"
+            onClick={() => setStep(1)}
+            className="w-full sm:w-auto"
+          >
             Back
           </Button>
         </div>

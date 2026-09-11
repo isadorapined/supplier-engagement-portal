@@ -2,13 +2,18 @@
 // gates, and the answered-question count. Everything here is shared by the
 // guided form and the upload review so the two behave identically.
 
-import { GUIDED_FIELDS, GUIDED_IDS, UPLOAD_IDS, SECTIONS } from './questions.js'
+import { GUIDED_FIELDS, GUIDED_IDS, UPLOAD_IDS, SECTIONS, IDENTITY_FIELDS } from './questions.js'
 import { ECOVADIS_IDS } from './ecovadis.js'
-import { isFilled, isValidEmail, isValidDate, isValidScore, findEmail } from './format.js'
+import { isFilled, isValidEmail, isValidDate, isValidScore } from './format.js'
 
 // Spec Section 7. Worded exactly as written — never reworded.
+//
+// Changed in v3.0, in the same commit that added the database write. The v2.1
+// wording ("Your answers stay in your browser…") became false the moment this
+// portal started persisting submissions, so the two changes must never be
+// separated: a build with one and not the other lies to the supplier.
 export const TRANSPARENCY_NOTICE =
-  'Your answers stay in your browser. This portal does not store, transmit, or email anything you enter. Closing this tab clears it.'
+  'Your information is stored for The Corporate’s review.'
 
 // --- 9.2 Conditional questions ---------------------------------------------
 
@@ -54,9 +59,11 @@ export function countAnswered(answers, ids) {
   return ids.reduce((total, id) => (isFilled(answers[id]) ? total + 1 : total), 0)
 }
 
-export const GUIDED_TOTAL = GUIDED_IDS.length // 33
-export const UPLOAD_TOTAL = UPLOAD_IDS.length // 30
-export const ECOVADIS_TOTAL = ECOVADIS_IDS.length // 9
+// Spec 9.4 denominators. Identity is never counted — it is mandatory and is
+// shown separately on View 7.
+export const GUIDED_TOTAL = GUIDED_IDS.length // 28 — S2–S7
+export const UPLOAD_TOTAL = UPLOAD_IDS.length // 28 — the same S2–S7 rows
+export const ECOVADIS_TOTAL = ECOVADIS_IDS.length // 9 — Q1–Q9
 
 // --- 9.3 Submit gating ------------------------------------------------------
 //
@@ -65,7 +72,29 @@ export const ECOVADIS_TOTAL = ECOVADIS_IDS.length // 9
 // field, and the guided form uses `section` to jump to the first of them.
 
 const guidedLabel = (id) => GUIDED_FIELDS.find((f) => f.id === id)?.label ?? id
-const guidedSection = (id) => GUIDED_FIELDS.find((f) => f.id === id)?.section ?? 'S1'
+const guidedSection = (id) => GUIDED_FIELDS.find((f) => f.id === id)?.section ?? SECTIONS[0].id
+
+// Spec 9.3, first row — the one gate shared by all four doors. All five fields
+// filled, and the contact email a valid address. Defined once so the doors
+// cannot drift apart, which is what acceptance criterion 3 checks.
+export function identityProblems(identity) {
+  const problems = []
+  for (const field of IDENTITY_FIELDS) {
+    const value = identity?.[field.key]
+    if (!isFilled(value)) {
+      problems.push({ id: field.key, label: field.label, section: 'identity' })
+    } else if (field.type === 'email' && !isValidEmail(value)) {
+      problems.push({
+        id: field.key,
+        label: `${field.label} — enter a valid email address`,
+        section: 'identity',
+      })
+    }
+  }
+  return problems
+}
+
+export const identityComplete = (identity) => identityProblems(identity).length === 0
 
 function declarationProblems(declaration, sectionId) {
   const problems = []
@@ -82,21 +111,10 @@ function declarationProblems(declaration, sectionId) {
 }
 
 // View 5 — guided assessment.
-export function guidedProblems(answers, declaration) {
-  const problems = []
-
-  for (const field of GUIDED_FIELDS) {
-    if (field.section !== 'S1') continue
-    if (!isFilled(answers[field.id])) {
-      problems.push({ id: field.id, label: field.label, section: 'S1' })
-    } else if (field.type === 'email' && !isValidEmail(answers[field.id])) {
-      problems.push({
-        id: field.id,
-        label: `${field.label} — enter a valid email address`,
-        section: 'S1',
-      })
-    }
-  }
+export function guidedProblems(identity, answers, declaration) {
+  // Step 1 gates before the supplier can reach S2, so this should already be
+  // satisfied. Re-checked here so a submit can never outrun the step.
+  const problems = identityProblems(identity)
 
   for (const id of conditionallyRequiredIds(answers)) {
     if (!isFilled(answers[id])) {
@@ -108,32 +126,12 @@ export function guidedProblems(answers, declaration) {
   return problems
 }
 
-// View 6 — upload review. The same rules, applied to the reviewed answers. The
-// template combines S1 into two cells, so the five discrete checks become two:
-// both S1 rows must be filled, and the contact row must contain an address.
-export function uploadProblems(answers, declaration) {
-  const problems = []
-
-  if (!isFilled(answers['T1'])) {
-    problems.push({
-      id: 'T1',
-      label: 'Legal name and registered country of the responding entity',
-      section: 'S1',
-    })
-  }
-  if (!isFilled(answers['T2'])) {
-    problems.push({
-      id: 'T2',
-      label: 'Primary contact name, title, and email address',
-      section: 'S1',
-    })
-  } else if (!isValidEmail(findEmail(answers['T2']))) {
-    problems.push({
-      id: 'T2',
-      label: 'Primary contact row — include a valid email address',
-      section: 'S1',
-    })
-  }
+// View 6 — upload review. Identical rules to View 5, applied to the reviewed
+// answers. v2.1 had to unpick the template's two combined S1 cells here; v3.0
+// does not read those rows at all, so identity comes from Step 1 like every
+// other door and the two doors now share one gate exactly.
+export function uploadProblems(identity, answers, declaration) {
+  const problems = identityProblems(identity)
 
   for (const id of conditionallyRequiredIds(answers)) {
     if (!isFilled(answers[id])) {
@@ -147,14 +145,8 @@ export function uploadProblems(answers, declaration) {
 
 // View 3a — EcoVadis scorecard upload.
 export function ecovadisUploadProblems(identity, answers, file) {
-  const problems = []
+  const problems = identityProblems(identity)
   if (!file) problems.push({ id: 'file', label: 'EcoVadis scorecard file' })
-  if (!isFilled(identity.company)) problems.push({ id: 'company', label: 'Company legal name' })
-  if (!isFilled(identity.contactName)) problems.push({ id: 'contactName', label: 'Contact name' })
-  if (!isFilled(identity.contactTitle)) problems.push({ id: 'contactTitle', label: 'Contact title' })
-  if (!isValidEmail(identity.contactEmail)) {
-    problems.push({ id: 'contactEmail', label: 'Contact email address' })
-  }
   if (!isValidDate(answers['Q1'])) problems.push({ id: 'Q1', label: 'Publication date' })
   if (!isValidDate(answers['Q2'])) problems.push({ id: 'Q2', label: 'Valid until' })
   if (!isFilled(answers['Q3']) || !isValidScore(answers['Q3'])) {
@@ -166,13 +158,7 @@ export function ecovadisUploadProblems(identity, answers, file) {
 // View 3b — EcoVadis form. Scores may be left blank where the scorecard does
 // not carry that theme; any score that is present must be 0–100.
 export function ecovadisFormProblems(identity, answers) {
-  const problems = []
-  if (!isFilled(identity.company)) problems.push({ id: 'company', label: 'Company legal name' })
-  if (!isFilled(identity.contactName)) problems.push({ id: 'contactName', label: 'Contact name' })
-  if (!isFilled(identity.contactTitle)) problems.push({ id: 'contactTitle', label: 'Contact title' })
-  if (!isValidEmail(identity.contactEmail)) {
-    problems.push({ id: 'contactEmail', label: 'Contact email address' })
-  }
+  const problems = identityProblems(identity)
   if (!isValidDate(answers['Q1'])) problems.push({ id: 'Q1', label: 'Publication date' })
   if (!isValidDate(answers['Q2'])) problems.push({ id: 'Q2', label: 'Valid until' })
   for (const id of ['Q3', 'Q4', 'Q5', 'Q6', 'Q7']) {
@@ -183,10 +169,15 @@ export function ecovadisFormProblems(identity, answers) {
   return problems
 }
 
-// The step index a blocked guided submission should jump to: S1–S7 are 0–6 and
-// the declaration is 7.
+// The step index a blocked guided submission should jump to. Spec View 5's
+// eight steps: Company & Contact is 0, S2–S7 are 1–6, the declaration is 7.
+export const IDENTITY_STEP = 0
+export const FIRST_SECTION_STEP = 1
+export const DECLARATION_STEP = SECTIONS.length + 1 // 7
+
 export function stepForSection(sectionId) {
-  if (sectionId === 'declaration') return SECTIONS.length
+  if (sectionId === 'identity') return IDENTITY_STEP
+  if (sectionId === 'declaration') return DECLARATION_STEP
   const index = SECTIONS.findIndex((s) => s.id === sectionId)
-  return index === -1 ? 0 : index
+  return index === -1 ? IDENTITY_STEP : index + FIRST_SECTION_STEP
 }

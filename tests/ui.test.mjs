@@ -1,4 +1,5 @@
 import { chromium } from 'playwright'
+import { mockSupabase, fillIdentity } from './support/supabase-mock.mjs'
 import path from 'node:path'
 
 const DIR = process.argv[2]
@@ -21,8 +22,13 @@ page.on('request', (r) => {
   const u = r.url()
   if (u.startsWith(BASE) || u.startsWith('data:') || u.startsWith('blob:')) return
   if (u.includes('fonts.googleapis.com') || u.includes('fonts.gstatic.com')) return
+  if (u.includes('/rest/v1/')) return // Supabase, expected from v3.0 on
   escaped.push(`${r.method()} ${u}`)
 })
+
+// This suite submits through View 3b, so the two Supabase calls are stubbed.
+const sb = await mockSupabase(page)
+
 const consoleErrors = []
 page.on('pageerror', (e) => consoleErrors.push(String(e)))
 
@@ -193,13 +199,16 @@ const doors = await page.evaluate(() => {
 check('criterion 11 - door cards match the path cards', doors,
   { count: 2, bg: [INK], overline: [SILVER], heading: [MINT], body: [SILVER], button: [CLAY] })
 
-// --- Criterion 6: the nine EcoVadis questions ---
+// --- Criterion 2 + 16: the door opens on the shared Company & Contact step,
+// and that step uses the existing form treatment with no new pattern ---
 await page.getByRole('button', { name: 'Enter your scorecard details' }).click()
-const evLabels = await page.locator('label').allInnerTexts()
-check('Q8 spelling corrected', evLabels.some((l) => l.includes('receive a medal in the last cycle')), true)
-check('Q9 spelling corrected', evLabels.some((l) => l.includes('receive a badge in the last cycle')), true)
-check('no "recieved" anywhere', (await page.content()).includes('recieved'), false)
-check('no "cicle" anywhere', (await page.content()).includes('cicle'), false)
+check('door two opens on Company & Contact',
+  await page.locator('h2').first().innerText(), 'Before you begin')
+const identityLabels = await page.locator('main label').allInnerTexts()
+check('criterion 2 — the five spec field labels, in order',
+  identityLabels.map((l) => l.replace('(required)', '').trim()),
+  ['Company legal name','Registered country','Primary contact name',
+   'Primary contact title','Primary contact email'])
 const form = await page.evaluate(() => {
   const s = (el) => getComputedStyle(el)
   const controls = [...document.querySelectorAll('main input, main select, main textarea')]
@@ -223,6 +232,22 @@ check('criterion 12 - no box shadow on any field', form.shadow, ['none'])
 check('criterion 12 - labels are Deep Space Blue', form.labels, [INK])
 check('criterion 12 - (required) is Burnt Clay', form.requiredTag, CLAY)
 
+// --- Criterion 6: the nine EcoVadis questions, on step 2 ---
+await fillIdentity(page)
+await page.getByRole('button', { name: 'Next' }).click()
+check('advances to the nine questions',
+  await page.locator('h2').first().innerText(), 'Enter your scorecard details')
+const evLabels = await page.locator('label').allInnerTexts()
+check('Q8 spelling corrected', evLabels.some((l) => l.includes('receive a medal in the last cycle')), true)
+check('Q9 spelling corrected', evLabels.some((l) => l.includes('receive a badge in the last cycle')), true)
+check('no "recieved" anywhere', (await page.content()).includes('recieved'), false)
+check('no "cicle" anywhere', (await page.content()).includes('cicle'), false)
+// Criterion 10 — step 2 is exactly Q1–Q9, with no identity field left behind.
+check('criterion 10 — step 2 holds exactly nine questions',
+  await page.locator('main input, main select').count(), 9)
+check('criterion 10 — no identity field on step 2',
+  await page.locator('[data-identity]').count(), 0)
+
 const buttons = await page.evaluate(() => {
   const s = (el) => getComputedStyle(el)
   const byName = (name) => [...document.querySelectorAll('button')].find((b) => b.textContent.trim() === name)
@@ -241,8 +266,12 @@ const badgeOptions = await page.locator('#ev-Q9 option').allInnerTexts()
 check('badge option set', badgeOptions.slice(1), ['None','Committed','Other'])
 
 // Criterion 20: the notice, worded exactly.
-const NOTICE = 'Your answers stay in your browser. This portal does not store, transmit, or email anything you enter. Closing this tab clears it.'
+// v3.0 wording. The v2.1 claim became false the moment submissions persisted.
+const NOTICE = 'Your information is stored for The Corporate\u2019s review.'
+const OLD_NOTICE = 'Your answers stay in your browser'
 check('notice above the submit control', (await page.content()).includes(NOTICE), true)
+check('criterion 12 — the old "stays in your browser" claim is gone',
+  (await page.content()).includes(OLD_NOTICE), false)
 
 // Gating, then a real submission through this door.
 await page.getByRole('button', { name: 'Submit', exact: true }).click()
@@ -253,16 +282,13 @@ const alertStyle = await page.evaluate(() => {
 })
 check('criterion 12 - validation is Burnt Clay text with no panel', alertStyle,
   { color: CLAY, bg: BARE, border: '0px' })
-await page.fill('#evf-company', 'Northwind Components GmbH')
-await page.fill('#evf-name', 'Marta Vogel')
-await page.fill('#evf-title', 'Head of Sustainability')
-await page.fill('#evf-email', 'marta.vogel@northwind-components.de')
 await page.fill('#ev-Q1', '2026-02-11')
 await page.fill('#ev-Q2', '2027-02-11')
 await page.fill('#ev-Q3', '68')
 await page.fill('#ev-Q4', '71')
 await page.selectOption('#ev-Q8', 'Silver')
 await page.getByRole('button', { name: 'Submit', exact: true }).click()
+await page.getByRole('heading', { name: 'Submission complete.' }).waitFor({ timeout: 5000 })
 
 // --- Criterion 18: the confirmation screen ---
 check('confirmation opens', await page.getByRole('heading', { name: 'Submission complete.' }).isVisible(), true)
@@ -275,18 +301,28 @@ check('shows the contact email', summaryText.includes('marta.vogel@northwind-com
 check('counts 5 of 9 answered', summaryText.includes('5 of 9'), true)
 check('timestamp formatted', /\d{1,2} \w+ \d{4}, \d{2}:\d{2}/.test(summaryText), true)
 check('notice on the confirmation screen', (await page.content()).includes(NOTICE), true)
+check('criterion 12 — registered country on the confirmation',
+  summaryText.includes('Germany'), true)
+check('criterion 4 — the door value written was ecovadis_form',
+  sb.lastSubmission().door, 'ecovadis_form')
 check('deadline restated', (await page.content()).includes('30 September 2026'), true)
 
-// --- Criterion 21: "Start another submission" clears everything ---
+// --- Criterion 13: "Start another submission" clears the browser only ---
+const callsBeforeRestart = sb.calls.length
 await page.getByRole('button', { name: 'Start another submission' }).click()
+check('criterion 13 — restart writes nothing to the database',
+  sb.calls.length, callsBeforeRestart)
 await page.getByRole('button', { name: 'Submit EcoVadis Scorecard' }).click()
 await page.getByRole('button', { name: 'Enter your scorecard details' }).click()
-check('company field cleared', await page.inputValue('#evf-company'), '')
+check('identity cleared', await page.inputValue('[data-identity="company"]'), '')
+check('registered country cleared', await page.inputValue('[data-identity="registeredCountry"]'), '')
+await fillIdentity(page)
+await page.getByRole('button', { name: 'Next' }).click()
 check('score cleared', await page.inputValue('#ev-Q3'), '')
 check('medal cleared', await page.inputValue('#ev-Q8'), '')
 
-console.log(`\n--- requests that left the page: ${escaped.length ? escaped.join(', ') : 'none'}`)
-check('criterion 19 — nothing left the page', escaped, [])
+console.log(`\n--- non-Supabase requests that left the page: ${escaped.length ? escaped.join(', ') : 'none'}`)
+check('nothing but Supabase leaves the page', escaped, [])
 check('no page errors', consoleErrors, [])
 
 await browser.close()

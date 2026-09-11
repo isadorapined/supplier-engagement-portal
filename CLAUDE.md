@@ -9,7 +9,7 @@ Position: Standalone — its own Supabase project, not part of a stack.
 ## Session Protocol
 At the start of every session:
 1. Pull the latest from main before reading anything else.
-2. Check docs/product-spec.md: if its version is newer than the "Spec version governed" line in this file, STOP. Tell the builder: "The spec has changed since this CLAUDE.md was written — re-run the Project Governor on the revised spec before building, or these rules may contradict it." Do not build against a stale CLAUDE.md.
+2. Check docs/product-spec.md: if its version differs from the "Spec version governed" line in this file — newer OR older — STOP and tell the builder. A newer spec means: "The spec has changed since this CLAUDE.md was written — re-run the Project Governor on the revised spec before building, or these rules may contradict it." An older one means the authoritative file has been displaced and the real spec is somewhere else in the repo; find it before building. (In session 3 the v3.0 spec had been uploaded to the repo root while docs/product-spec.md still held v2.1, and a newer-only check would have passed straight over it.) Do not build against a stale CLAUDE.md or a stale spec.
 3. Read PROGRESS.md in the project root — it is the current state of this build. If it is missing, recreate it with the structure at the end of this section, then continue.
 4. Increment the session number and update the date in PROGRESS.md.
 5. If "Notes for next session" has content: repeat the notes back to the builder, treat them as this session's priorities, then clear the section.
@@ -42,24 +42,38 @@ Export — browser only, no server function — XLSX: the blank official questio
 
 ## Environment Variables
 VITE_SUPABASE_URL — Supabase: Project Settings → API → Project URL — Netlify env var
-VITE_SUPABASE_ANON_KEY — Supabase: Project Settings → API → anon / public key — Netlify env var
-A Supabase service role key is also created with the project but has no active use case in this build — it is never read by the frontend and is not wired into any function. Key storage follows function placement: Netlify Functions read Netlify environment variables. No value ever appears in code or in any file committed to GitHub.
+VITE_SUPABASE_ANON_KEY — Supabase: Project Settings → API → anon / publishable key — Netlify env var
+
+There are **no Netlify Functions in this build** and none are planned. Both variables are `VITE_`-prefixed, which means Vite inlines them into the client bundle at build time — they are read by the browser, not by a server. They must be set in the Netlify dashboard before the first deploy, and in a local `.env.local` (gitignored) for `npm run dev`. A missing variable makes every submit fail with the save-failure notice.
+
+The anon key is **public by design**: it ships inside the JavaScript bundle and anyone can read it out of the deployed site. That is expected and safe — but *only* because RLS is enabled on every table. RLS is what protects the data; the key is not a secret.
+
+A Supabase service role key also exists but has no use case in this build. It is never read by the frontend, never wired into anything, and must never appear in a `VITE_` variable. `.env` and `.env.*` are gitignored (`.env.example` excepted).
 
 ## Supabase
-Project: "the-corporate-supplier-portal" — does not exist yet. At the start of the next build session, confirm this name with the builder, then create the project via Supabase MCP before building anything else. Plan: Free — pauses after roughly a week without traffic; acceptable for this class/portfolio context, not a live client deployment.
+**docs/supabase-setup.md exists and is the schema source of truth.** Read it before any database work. Everything below is summary; that file wins on any conflict.
 
-Build this schema — authoritative until docs/supabase-setup.md exists:
-companies: legal_name, registered_country, contact_name, contact_title, contact_email, created_at, updated_at
-submissions: company_id (FK → companies.id), path, door, answers (JSON, keyed by question id), attached_file_name, attached_file_size, signatory_name, declaration_date, submitted_at
+Project: **"The Corporate"**, ref `smnrfopzzzhazkehcqqn`, us-east-1, Free plan. Built in session 3. This section previously said the project did not exist and should be created as "the-corporate-supplier-portal" — it did exist, empty, and the builder confirmed reusing it. Do not create a second project.
 
-RLS — build these policies, never skip: `companies` — anon key: select (to look up by legal_name), insert, update; no delete. `submissions` — anon key: insert-only; no select, update, or delete.
+Free plan pauses after roughly a week without traffic, and a paused project refuses writes. Acceptable for this class/portfolio context; it is also the most likely real cause of a supplier hitting the save-failure path.
 
-After setup, write docs/supabase-setup.md and update it at every save point that touches the database. It must contain: project name, project ID, project URL, plan, every table with field names and types, RLS policies per table, notes for future sessions, and a last-updated line with date and session number. From the moment it exists, that file is the schema source of truth.
+RLS — enabled on both tables, never disabled:
+- `companies` — **no anon policy at all.** RLS on with no policy denies every anon read and write, so supplier contact details are unreadable from the browser. The only route in is `resolve_company()`.
+- `submissions` — anon: insert only. No select, update, or delete.
+- `public.resolve_company(...)` — `SECURITY DEFINER`, execute granted to `anon` only. Does the match-or-insert on `lower(btrim(legal_name))` server-side and returns just the company id. A unique index on that expression makes it atomic.
+
+An earlier version of this section granted anon `select` on `companies` so the client could do the lookup itself. That would have exposed every supplier's contact name, title and email to anyone with the portal URL, and could still have produced duplicate rows under concurrent submits. Do not go back to it.
+
+Because `submissions` is insert-only, `.insert().select()` is refused — View 7 renders from in-browser state, never a read-back.
+
+Update docs/supabase-setup.md at every save point that touches the database.
 
 ## Hard Rules
-- API keys never in any frontend file or GitHub commit. Always called through the Supabase client using the anon key only.
+- Keys are never hardcoded and never committed — always read from environment variables, always through the Supabase client, anon key only. Note the anon key is *published* in the built bundle by design; "never in a frontend file" means never typed into source, not that it stays hidden at runtime. RLS is what makes that safe.
 - Netlify Identity: never. Supabase Auth is the only authentication system that may ever be added to this stack — not built in this version.
-- RLS: never disabled on any table. If a query fails, fix the policy or the query — never disable RLS to work around it.
+- RLS: never disabled on any table, at any tier, with or without login. If a query fails, fix the policy or the query — never disable RLS to work around it. Never add a select policy to `companies`; if something needs company data, write a `SECURITY DEFINER` function that returns only what it needs.
+- A submission that fails to save never shows the confirmation screen. The transparency notice claims the information is stored, so reaching View 7 on a failed write would make the portal lie. Spec 9.5: stay on the door, keep the answers, say plainly that nothing was sent, allow a retry.
+- The transparency notice wording and the persistence behaviour change together, in one commit, always. Either alone makes the notice false.
 - The EcoVadis PDF and the uploaded/downloaded workbook are never uploaded to Supabase Storage or any server. Only filename and size are recorded, on the `submissions` row.
 - Company matching at submit time: look up `companies` by `legal_name`, case-insensitive, leading/trailing whitespace ignored. On a match, reuse that `company_id` and overwrite `registered_country`, `contact_name`, `contact_title`, `contact_email`, and `updated_at`. On no match, insert a new row. Never attempt fuzzy matching.
 - No login, no roles, no per-supplier data isolation is built in this version.
@@ -91,7 +105,8 @@ Out of scope — do not build:
 
 ## Reference Docs
 Read before building the related part:
-- docs/product-spec.md — authoritative question sets, view-by-view UI detail, validation rules, the 20 acceptance criteria, and v2.1 Section 10's full visual specification (still binding).
-- docs/supabase-setup.md — schema source of truth (created in the next build session).
+- docs/product-spec.md — **v3.0, authoritative.** Question sets, view-by-view UI detail, validation rules, the 20 acceptance criteria, and 9.5's submit-failure behaviour. Its Section 6, Section 14 and Section 2 Tier table carry build-time corrections about RLS; Section 4 records the real Supabase project. It defers View 1's detail and all of Section 10 to v2.1 by reference.
+- docs/product-spec-v2.1.md — the previous version, kept because v3.0 cites it as still binding for View 1 and for the whole of Section 10 (10.1–10.6: hero band, card treatment, form treatment, button hierarchy, notices). Read it for any visual question. Not authoritative on data, views, or logic.
+- docs/supabase-setup.md — **schema source of truth.** Tables, columns, indexes, RLS policies, `resolve_company`, migrations, and what the two intentional linter findings mean.
 - .claude/skills/data-leaf-brand/SKILL.md — full brand system and tokens.css
 PROGRESS.md in the root is read at every session start per the Session Protocol.

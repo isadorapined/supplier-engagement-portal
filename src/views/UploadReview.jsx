@@ -10,11 +10,13 @@ import {
   Notice,
 } from '@/components/Chrome'
 import Declaration from '@/components/Declaration'
+import CompanyContact from '@/components/CompanyContact'
 import FilePicker from '@/components/FilePicker'
 import { TEMPLATE_ROWS, SECTIONS, sectionById } from '@/lib/questions'
 import { parseTemplateFile } from '@/lib/parseTemplate'
 import {
   uploadProblems,
+  identityProblems,
   conditionallyRequiredIds,
   pfasState,
   countAnswered,
@@ -31,8 +33,13 @@ const GROUPED = SECTIONS.map((section) => ({
   rows: TEMPLATE_ROWS.filter((row) => row.displaySection === section.id),
 })).filter((group) => group.rows.length > 0)
 
-// View 6 — Path B door two.
+// View 6 — Path B door two. The universal Company & Contact step comes first
+// (spec: before the download panel, so identity is on record even if the
+// supplier abandons the flow after downloading the template), then download,
+// then upload and review.
 export default function UploadReview({ state, update, onSubmit, onBack }) {
+  const [step, setStep] = useState(1)
+  const [showIdentityProblems, setShowIdentityProblems] = useState(false)
   const [error, setError] = useState(null)
   const [busy, setBusy] = useState(false)
   const [problems, setProblems] = useState([])
@@ -67,6 +74,7 @@ export default function UploadReview({ state, update, onSubmit, onBack }) {
       assessmentNotes: {},
       uploadAccepted: false,
       uploadedFileName: '',
+      uploadedFileSize: null,
     }))
     setProblems([])
 
@@ -90,6 +98,8 @@ export default function UploadReview({ state, update, onSubmit, onBack }) {
       assessmentNotes: result.notes,
       uploadAccepted: true,
       uploadedFileName: file.name,
+      // Name and size only — the workbook's bytes are never transmitted.
+      uploadedFileSize: file.size,
       declaration: {
         ...draft.declaration,
         signatory: result.declaration.signatory || draft.declaration.signatory,
@@ -106,19 +116,52 @@ export default function UploadReview({ state, update, onSubmit, onBack }) {
       assessmentNotes: {},
       uploadAccepted: false,
       uploadedFileName: '',
+      uploadedFileSize: null,
     }))
   }
 
+  const next = () => {
+    const found = identityProblems(state.identity)
+    setShowIdentityProblems(true)
+    if (found.length === 0) {
+      setShowIdentityProblems(false)
+      setStep(2)
+      window.scrollTo({ top: 0 })
+    }
+  }
+
+  const setIdentity = (key, value) =>
+    update((draft) => ({ ...draft, identity: { ...draft.identity, [key]: value } }))
+
   const submit = () => {
-    const found = uploadProblems(answers, declaration)
+    const found = uploadProblems(state.identity, answers, declaration)
     setProblems(found)
     if (found.length === 0) onSubmit()
     else window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' })
   }
 
+  if (step === 1) {
+    return (
+      <FlowShell>
+        <CompanyContact
+          identity={state.identity}
+          onChange={setIdentity}
+          onNext={next}
+          onBack={onBack}
+          breadcrumb="Path B · Door two"
+          stepLabel="Step 1 — before you download the template"
+          problems={identityProblems(state.identity)}
+          showProblems={showIdentityProblems}
+        />
+      </FlowShell>
+    )
+  }
+
   return (
     <FlowShell>
-      <Button variant="back" size="sm" onClick={onBack} className="-ml-3">
+      {/* Back steps to the Company & Contact step rather than leaving the
+          door, so the identity just entered is not discarded. */}
+      <Button variant="back" size="sm" onClick={() => setStep(1)} className="-ml-3">
         ← Back
       </Button>
 
@@ -269,11 +312,19 @@ export default function UploadReview({ state, update, onSubmit, onBack }) {
 
           <div className="mt-8 space-y-5">
             <TransparencyNotice />
+            {/* Spec 9.5 — a failed write never reaches View 7. */}
+            <Notice role="alert">{state.saveError}</Notice>
             <div className="flex flex-col gap-3 sm:flex-row">
-              <Button variant="submit" size="lg" onClick={submit} className="w-full sm:w-auto">
-                Submit
+              <Button
+                variant="submit"
+                size="lg"
+                onClick={submit}
+                disabled={state.saving}
+                className="w-full sm:w-auto"
+              >
+                {state.saving ? 'Saving…' : 'Submit'}
               </Button>
-              <Button size="lg" variant="back" onClick={onBack} className="w-full sm:w-auto">
+              <Button size="lg" variant="back" onClick={() => setStep(1)} className="w-full sm:w-auto">
                 Back
               </Button>
             </div>
