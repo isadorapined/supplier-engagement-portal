@@ -4,7 +4,7 @@
 > anything. Update it at every save point. Replace content — do not append.
 > History lives in git.
 
-**Session:** 4 — traced "submission saved nothing" to the deploy, not the code
+**Session:** 4 — portal live and persisting; two deployment faults found and fixed
 **Last updated:** 11 September 2026
 **Live URL:** https://the-corporate-sep.netlify.app (Netlify project `the-corporate-sep`, deploys from `main`)
 
@@ -66,23 +66,22 @@ character outside Latin-1, so `Headers.set()` threw while building the `apikey`
 header and the request was never sent. Almost certainly an ellipsis picked up by
 copying a key from a display that truncates it. Fix is the short
 `sb_publishable_...` key copied with the dashboard copy button, then a no-cache
-redeploy. **Not yet applied as at this save point** — the published bundle still
-carries the corrupted value, confirmed by the 14:50 deploy reporting "all files
-already uploaded", i.e. byte-identical output to the previous build.
+redeploy. Applied, and **the portal now works end to end**: a live submission at
+14:53 UTC wrote both rows — company `isa` and a linked `full` /
+`assessment_upload` submission carrying 28 answers, the attached filename and
+size, and the declaration. Criterion 20's persistence half is met.
 
 ## Remaining work
-- [ ] **Builder: set `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` in the
-      Netlify dashboard, then trigger a fresh deploy.** Vite inlines both at
-      *build* time, so setting them does nothing to a bundle already built —
-      it must be "Clear cache and deploy site", not just a save. Without them
-      `isConfigured` is false and every submit shows the save-failure notice.
-      Values are in docs/supabase-setup.md.
-- [ ] Criterion 20 on the deployed site — submissions made live appear in the
-      Supabase table editor; template downloads; no 404s
+- [x] Netlify environment variables set and inlined by a fresh build; live
+      submission confirmed writing to Supabase (session 4)
+- [ ] Criterion 20, remainder — template downloads from the deployed site, and
+      no 404s. The persistence half is done and verified.
+- [ ] Delete the `isa` test company and its submission once no longer needed —
+      they are real rows in `companies` and `submissions`
 - [ ] Criterion 19 on real devices — mobile layout end to end
 - [ ] Run `tests/persistence.test.mjs` with a service role key from an
-      unproxied machine (this session's environment blocks the Supabase host,
-      so the live HTTP round trip is the one thing not yet exercised)
+      unproxied machine (still not exercised here; the live submission covers
+      what it was standing in for)
 - [ ] Builder reviews the "Why We Are Asking" body copy before deployment
 - [ ] Builder confirms or replaces the "PROGRAMME CONTEXT" overline wording
 - [ ] Builder reviews the light nav bar sitting above the dark hero band
@@ -171,13 +170,10 @@ already uploaded", i.e. byte-identical output to the previous build.
   branch that then needs merging. v3.0 sat unmerged for a day because of this,
   and it is what made a finished build look like a broken database. Treat a save
   point as incomplete until the PR is merged and Netlify has deployed.
-- **The live HTTP round trip to Supabase is unverified.** This session's
-  environment blocks `smnrfopzzzhazkehcqqn.supabase.co`, so every layer was
-  tested but not joined end to end over the wire: the SQL was exercised as the
-  anon role through MCP, and the exact request payloads `submit.js` builds were
-  captured with the network stubbed and replayed against the database verbatim.
-  Both halves pass. Run `tests/persistence.test.mjs` from an unproxied machine,
-  or make one live submission after deploying, to close it.
+- ~~The live HTTP round trip to Supabase is unverified.~~ **Closed in session
+  4.** A real submission from the deployed site wrote both rows as specified.
+  `tests/persistence.test.mjs` still has not been run from an unproxied machine,
+  but the thing it stands in for has now been observed directly.
 - Free plan pauses after roughly a week without traffic, and a paused project
   refuses writes. Suppliers would see the save-failure notice. Most likely real
   cause of a failed submission.
