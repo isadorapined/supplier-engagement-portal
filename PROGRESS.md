@@ -53,8 +53,22 @@ Verified the database half is sound and needs no work: `companies` and
 `submissions` exist with RLS on, `resolve_company()` is SECURITY DEFINER with
 EXECUTE granted to `anon`, and the single `submissions` INSERT policy for `anon`
 is the only policy in `public` — the intended shape. Builder merged PR #2 during
-the session (`main` now at 812c740). The Netlify environment variables are still
-unset, so the deploy built from that merge is itself broken.
+the session (`main` now at 812c740) and redeployed with both Netlify environment
+variables set.
+
+That surfaced a second, unrelated fault. The submission still failed, and the
+edge logs showed **no inbound request at all** — not a rejection, nothing. The
+browser console named it: `resolve_company failed` carrying
+`TypeError: Failed to execute 'set' on 'Headers': String contains non ISO-8859-1
+code point.` The variables were configured correctly all along (right names, All
+scopes, same value in all deploy contexts); the anon key's *value* carried a
+character outside Latin-1, so `Headers.set()` threw while building the `apikey`
+header and the request was never sent. Almost certainly an ellipsis picked up by
+copying a key from a display that truncates it. Fix is the short
+`sb_publishable_...` key copied with the dashboard copy button, then a no-cache
+redeploy. **Not yet applied as at this save point** — the published bundle still
+carries the corrupted value, confirmed by the 14:50 deploy reporting "all files
+already uploaded", i.e. byte-identical output to the previous build.
 
 ## Remaining work
 - [ ] **Builder: set `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` in the
@@ -132,12 +146,26 @@ unset, so the deploy built from that merge is itself broken.
   checked on the request bodies, which is stronger than the old request count.
 
 ## Known issues
-- **The currently published deploy cannot write to Supabase.** It was built
-  from the PR #2 merge while the two Netlify environment variables were still
-  unset, so `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` are inlined as
-  `undefined` and `isConfigured` is false. Setting the variables is not enough
-  on its own — the site must be rebuilt afterwards. Until then every submission
-  ends on the save-failure notice.
+- **A corrupted API key value fails with no server-side trace whatsoever.**
+  Worth knowing, because the symptom points at the database and the cause is a
+  clipboard. If `VITE_SUPABASE_ANON_KEY` contains any character outside
+  ISO-8859-1 — an ellipsis, a smart quote, an en dash — supabase-js throws
+  `TypeError: Failed to execute 'set' on 'Headers'` while building the `apikey`
+  header, *before* the request leaves the browser. Supabase logs stay empty,
+  both tables stay at 0 rows, and the supplier sees the ordinary save-failure
+  notice. It looks identical to a database or policy problem and is neither.
+  The usual source is copying a key from a UI that truncates the display with a
+  real `…` character; the Supabase dashboard's API Keys page does exactly that.
+  Always use its copy button, never a mouse selection. Diagnosing this took a
+  browser console — `submit.js` logs a distinct message for each failure mode,
+  so read the console before touching the database.
+- **Netlify env vars are inlined at build time, so a rebuild is mandatory.**
+  Saving `VITE_SUPABASE_URL` or `VITE_SUPABASE_ANON_KEY` does nothing to a
+  bundle that already exists — Vite pastes the values in during `npm run build`.
+  After any change to either, trigger "Deploy project without cache" (Netlify's
+  new name for "Clear cache and deploy site"). Leave "Contains secret values"
+  unticked on both: the anon key is meant to ship inside the bundle, and marking
+  it secret can make Netlify's secrets scanner fail the build for finding it.
 - **Work reaches `main` only by merging a PR, not by pushing.** CLAUDE.md's save
   point says "commit and push to main", but these sessions push to a `claude/*`
   branch that then needs merging. v3.0 sat unmerged for a day because of this,
