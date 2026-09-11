@@ -4,9 +4,9 @@
 > anything. Update it at every save point. Replace content — do not append.
 > History lives in git.
 
-**Session:** 3 — v3.0 built: Supabase persistence and the universal Company & Contact step
+**Session:** 4 — traced "submission saved nothing" to the deploy, not the code
 **Last updated:** 11 September 2026
-**Live URL:** none yet [Rule: fill in after the first successful deploy]
+**Live URL:** https://the-corporate-sep.netlify.app (Netlify project `the-corporate-sep`, deploys from `main`)
 
 ## Current state
 v3.0 is built and passing the full local test pass — 49 parser checks and three
@@ -41,22 +41,28 @@ browser suites now assert that on the request bodies themselves, since the old
 "no request leaves the page" assertion stopped being true this version.
 
 ## Last session
-Audited the repo before building and found the v3.0 spec sitting in the repo
-root while docs/product-spec.md still held v2.1 — CLAUDE.md pointed at the stale
-one, and its version tripwire only fired on *newer* specs, so it would have
-passed straight over it. Moved v3.0 into docs/, kept v2.1 as
-docs/product-spec-v2.1.md (v3.0 cites it as binding for View 1 and all of
-Section 10), and made the tripwire fire on any mismatch. Found a Supabase
-project already existed; builder confirmed reusing it. Corrected the spec's
-three "no RLS needed" claims, added the missing submit-failure path as §9.5, and
-fixed §10's subsection list and View 6's back-navigation. Then built the
-database, the shared step, the submit layer, and the failure path.
+Builder reported completing a submission on the live site with nothing arriving
+in the database. Traced it: the code was never the problem. v3.0 was committed
+to `claude/ecstatic-dijkstra-zwahfk` and left sitting in **open PR #2** — never
+merged. Netlify deploys from `main`, and `main` was still v2.1, whose `submit()`
+sets the confirmation view and fires no network request at all. The supplier saw
+a normal confirmation screen; nothing had been sent, exactly as v2.1 was built
+to behave. Both tables read 0 rows, consistent.
+
+Verified the database half is sound and needs no work: `companies` and
+`submissions` exist with RLS on, `resolve_company()` is SECURITY DEFINER with
+EXECUTE granted to `anon`, and the single `submissions` INSERT policy for `anon`
+is the only policy in `public` — the intended shape. Builder merged PR #2 during
+the session (`main` now at 812c740). The Netlify environment variables are still
+unset, so the deploy built from that merge is itself broken.
 
 ## Remaining work
 - [ ] **Builder: set `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` in the
-      Netlify dashboard before the first deploy.** Without them every submit
-      fails with the save-failure notice. Values are in docs/supabase-setup.md.
-- [ ] Connect Netlify to the repo; confirm the live URL and record it above
+      Netlify dashboard, then trigger a fresh deploy.** Vite inlines both at
+      *build* time, so setting them does nothing to a bundle already built —
+      it must be "Clear cache and deploy site", not just a save. Without them
+      `isConfigured` is false and every submit shows the save-failure notice.
+      Values are in docs/supabase-setup.md.
 - [ ] Criterion 20 on the deployed site — submissions made live appear in the
       Supabase table editor; template downloads; no 404s
 - [ ] Criterion 19 on real devices — mobile layout end to end
@@ -126,6 +132,17 @@ database, the shared step, the submit layer, and the failure path.
   checked on the request bodies, which is stronger than the old request count.
 
 ## Known issues
+- **The currently published deploy cannot write to Supabase.** It was built
+  from the PR #2 merge while the two Netlify environment variables were still
+  unset, so `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` are inlined as
+  `undefined` and `isConfigured` is false. Setting the variables is not enough
+  on its own — the site must be rebuilt afterwards. Until then every submission
+  ends on the save-failure notice.
+- **Work reaches `main` only by merging a PR, not by pushing.** CLAUDE.md's save
+  point says "commit and push to main", but these sessions push to a `claude/*`
+  branch that then needs merging. v3.0 sat unmerged for a day because of this,
+  and it is what made a finished build look like a broken database. Treat a save
+  point as incomplete until the PR is merged and Netlify has deployed.
 - **The live HTTP round trip to Supabase is unverified.** This session's
   environment blocks `smnrfopzzzhazkehcqqn.supabase.co`, so every layer was
   tested but not joined end to end over the wire: the SQL was exercised as the
