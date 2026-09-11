@@ -19,7 +19,7 @@ export const MESSAGES = {
   tooLarge:
     'That file is larger than 10 MB. Please upload the completed template, not a document pack.',
   questions: (missing) =>
-    `This file doesn’t match the official 2026 template. ${missing} of the 30 questions are missing or have been changed. Download a fresh copy of the template above and transfer your answers into it.`,
+    `This file doesn’t match the official 2026 template. ${missing} of the 28 questions are missing or have been changed. Download a fresh copy of the template above and transfer your answers into it.`,
 }
 
 // Case-insensitive, and blind to leading/trailing whitespace and non-breaking
@@ -69,9 +69,11 @@ function findHeader(rows) {
   return null
 }
 
-// Check 5 — every one of the thirty question texts appears in the QUESTION /
-// METRIC column, in the template's order. Matching is on question text alone,
-// which is what lets row 23's wrong `S5` section tag through untouched.
+// Check 5 — every one of the twenty-eight S2–S7 question texts appears in the
+// QUESTION / METRIC column, in the template's order. Matching is on question
+// text alone, which is what lets row 23's wrong `S5` section tag through
+// untouched — and what lets the scan walk straight past the template's two S1
+// rows, which v3.0 no longer reads (spec 9.1).
 function matchQuestions(rows, headerIndex, questionColumn) {
   const matches = []
   const missing = []
@@ -190,7 +192,7 @@ export async function parseTemplateFile(file) {
   const header = findHeader(rows)
   if (!header) return { ok: false, message: MESSAGES.headers }
 
-  // Check 5 — all thirty question texts, in order.
+  // Check 5 — all twenty-eight S2–S7 question texts, in order.
   const questionColumn = header.positions['QUESTION / METRIC']
   const { matches, missing } = matchQuestions(rows, header.index, questionColumn)
   if (missing.length > 0) {

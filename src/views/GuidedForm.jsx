@@ -10,18 +10,31 @@ import {
   Notice,
 } from '@/components/Chrome'
 import Declaration from '@/components/Declaration'
+import CompanyContact from '@/components/CompanyContact'
 import { SECTIONS, guidedFieldsFor } from '@/lib/questions'
 import {
   guidedProblems,
+  identityProblems,
   conditionallyRequiredIds,
   pfasState,
   stepForSection,
+  IDENTITY_STEP,
+  FIRST_SECTION_STEP,
+  DECLARATION_STEP,
 } from '@/lib/rules'
 
-const TOTAL_STEPS = SECTIONS.length + 1 // S1–S7 plus Declaration
+// Spec View 5 — eight steps: Company & Contact, S2–S7, Declaration. "S1" was
+// retired as a numbered assessment section in v3.0; its five fields are the
+// Company & Contact step, so they are asked once rather than twice.
+const TOTAL_STEPS = SECTIONS.length + 2
 
 function ProgressIndicator({ step }) {
-  const label = step < SECTIONS.length ? SECTIONS[step].id : 'Declaration'
+  const label =
+    step === IDENTITY_STEP
+      ? 'Company & Contact'
+      : step === DECLARATION_STEP
+        ? 'Declaration'
+        : SECTIONS[step - FIRST_SECTION_STEP].id
   return (
     <div>
       <div className="flex flex-wrap items-baseline justify-between gap-2">
@@ -73,10 +86,25 @@ export default function GuidedForm({ state, update, onSubmit, onBack }) {
     window.scrollTo({ top: 0, behavior: 'smooth' })
   }
 
-  const onDeclarationStep = step === SECTIONS.length
+  const onIdentityStep = step === IDENTITY_STEP
+  const onDeclarationStep = step === DECLARATION_STEP
+
+  const setIdentity = (key, value) =>
+    update((draft) => ({ ...draft, identity: { ...draft.identity, [key]: value } }))
+
+  // The Company & Contact step cannot be advanced past until all five fields
+  // are filled and the email is valid (spec 9.3, acceptance criterion 3).
+  const nextFromIdentity = () => {
+    const found = identityProblems(state.identity)
+    setProblems(found)
+    if (found.length === 0) {
+      setProblems([])
+      goToStep(FIRST_SECTION_STEP)
+    }
+  }
 
   const submit = () => {
-    const found = guidedProblems(answers, declaration)
+    const found = guidedProblems(state.identity, answers, declaration)
     setProblems(found)
     if (found.length === 0) {
       onSubmit()
@@ -87,7 +115,7 @@ export default function GuidedForm({ state, update, onSubmit, onBack }) {
     if (target !== step) goToStep(target)
   }
 
-  const section = onDeclarationStep ? null : SECTIONS[step]
+  const section = onIdentityStep || onDeclarationStep ? null : SECTIONS[step - FIRST_SECTION_STEP]
   const fields = section ? guidedFieldsFor(section.id) : []
 
   return (
@@ -105,7 +133,33 @@ export default function GuidedForm({ state, update, onSubmit, onBack }) {
         <ProgressIndicator step={step} />
       </div>
 
-      {section ? (
+      {onIdentityStep ? (
+        <>
+          <SectionHeading
+            title="Before you begin"
+            className="mt-8"
+          />
+
+          <Card className="mt-8">
+            <CompanyContact
+              embedded
+              identity={state.identity}
+              onChange={setIdentity}
+              problems={problems}
+              showProblems={problems.length > 0}
+            />
+          </Card>
+
+          <div className="mt-10 flex flex-col gap-3 sm:flex-row">
+            <Button variant="nav" size="lg" onClick={nextFromIdentity} className="w-full sm:w-auto">
+              Next
+            </Button>
+            <Button size="lg" variant="back" onClick={onBack} className="w-full sm:w-auto">
+              Back
+            </Button>
+          </div>
+        </>
+      ) : section ? (
         <>
           <SectionHeading
             overline={section.esrs}
@@ -183,10 +237,9 @@ export default function GuidedForm({ state, update, onSubmit, onBack }) {
             })}
           </div>
 
-          {section.id === 'S1' ? (
+          {section.id === SECTIONS[0].id ? (
             <Hint className="mt-4">
-              Every question outside this section may be left blank. A documented gap is a valid
-              answer.
+              Every assessment question may be left blank. A documented gap is a valid answer.
             </Hint>
           ) : null}
 
@@ -221,9 +274,17 @@ export default function GuidedForm({ state, update, onSubmit, onBack }) {
 
           <div className="mt-8 space-y-5">
             <TransparencyNotice />
+            {/* Spec 9.5 — a failed write never reaches View 7. */}
+            <Notice role="alert">{state.saveError}</Notice>
             <div className="flex flex-col gap-3 sm:flex-row">
-              <Button variant="submit" size="lg" onClick={submit} className="w-full sm:w-auto">
-                Submit
+              <Button
+                variant="submit"
+                size="lg"
+                onClick={submit}
+                disabled={state.saving}
+                className="w-full sm:w-auto"
+              >
+                {state.saving ? 'Saving…' : 'Submit'}
               </Button>
               <Button
                 size="lg"

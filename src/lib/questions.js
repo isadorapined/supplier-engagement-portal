@@ -18,8 +18,11 @@ export const TEMPLATE_HEADERS = [
   'STATUS',
 ]
 
+// The six assessment sections. "S1 — General Information & EcoVadis Bypass"
+// was retired as a numbered section in v3.0: its five fields became the
+// universal Company & Contact step (IDENTITY_FIELDS below), so they are asked
+// once at the start of every door instead of only inside Path B.
 export const SECTIONS = [
-  { id: 'S1', title: 'General Information & EcoVadis Bypass', esrs: 'All ESRS' },
   { id: 'S2', title: 'Climate & Decarbonisation', esrs: 'ESRS E1' },
   { id: 'S3', title: 'Pollution & PFAS', esrs: 'ESRS E2' },
   { id: 'S4', title: 'Water & Marine Resources', esrs: 'ESRS E3' },
@@ -31,39 +34,24 @@ export const SECTIONS = [
 export const sectionById = (id) => SECTIONS.find((s) => s.id === id)
 
 // ---------------------------------------------------------------------------
-// The thirty template rows, in the order they appear in the workbook.
+// The twenty-eight S2–S7 template rows, in the order they appear in the
+// workbook.
 //
-// `id` is the session-state key. For the twenty-eight rows outside S1 it is the
-// guided form's own field id, so an answer typed in the guided form and an
-// answer parsed from an upload live under the same key and the conditional
-// rules in Section 9.2 apply to both without special-casing.
+// `id` is the session-state key, and is the guided form's own field id, so an
+// answer typed in the guided form and an answer parsed from an upload live
+// under the same key and the conditional rules in Section 9.2 apply to both
+// without special-casing.
 //
-// S1 is the exception: the template combines five facts into two cells, so
-// those two rows carry their own keys (T1, T2) and the guided form splits them
-// into S1-1 … S1-5.
+// The workbook still physically contains two S1 rows above these, combining
+// five identity facts into two cells. As of v3.0 the parser does not read them
+// at all (spec 9.1): that identity is captured by the door's Company & Contact
+// step instead. They are simply absent from this list, and check 5 scans past
+// them by matching on question text rather than on row position.
 //
 // `displaySection` is where the row belongs, not what the workbook tags it.
 // Row 23 is tagged S5 in the file but is a water question — spec 9.1 defect one.
 // ---------------------------------------------------------------------------
 export const TEMPLATE_ROWS = [
-  {
-    id: 'T1',
-    row: 6,
-    displaySection: 'S1',
-    displayId: 'S1-1 / S1-2',
-    esrs: '—',
-    long: false,
-    templateText: 'Legal name and registered country of the responding entity.',
-  },
-  {
-    id: 'T2',
-    row: 7,
-    displaySection: 'S1',
-    displayId: 'S1-3 / S1-4 / S1-5',
-    esrs: '—',
-    long: false,
-    templateText: 'Primary contact name, title, and email address for this assessment.',
-  },
   {
     id: 'S2-1',
     row: 9,
@@ -348,17 +336,10 @@ export const TEMPLATE_ROWS = [
 export const UPLOAD_IDS = TEMPLATE_ROWS.map((r) => r.id)
 
 // ---------------------------------------------------------------------------
-// The guided form — thirty-three fields across S1–S7, spec Section 8 order.
+// The guided form — twenty-eight fields across S2–S7, spec Section 8 order.
 // The wording here is the corrected wording; the workbook's is not reused.
 // ---------------------------------------------------------------------------
 export const GUIDED_FIELDS = [
-  // S1 — the two combined template rows, split into five discrete fields.
-  { id: 'S1-1', section: 'S1', esrs: '—', type: 'text', required: true, label: 'Legal name of the responding entity' },
-  { id: 'S1-2', section: 'S1', esrs: '—', type: 'text', required: true, label: 'Registered country of the responding entity' },
-  { id: 'S1-3', section: 'S1', esrs: '—', type: 'text', required: true, label: 'Primary contact name for this assessment' },
-  { id: 'S1-4', section: 'S1', esrs: '—', type: 'text', required: true, label: 'Primary contact job title' },
-  { id: 'S1-5', section: 'S1', esrs: '—', type: 'email', required: true, label: 'Primary contact email address' },
-
   // S2 — Climate & Decarbonisation
   {
     id: 'S2-1',
@@ -609,6 +590,28 @@ export const GUIDED_FIELDS = [
 ]
 
 export const GUIDED_IDS = GUIDED_FIELDS.map((f) => f.id)
+
+// ---------------------------------------------------------------------------
+// The universal Company & Contact step — spec v3.0 Section 8.
+//
+// Defined once and rendered identically as the first step of all four doors
+// (Views 3a, 3b, 5, 6), which is what acceptance criterion 2 checks. Order and
+// wording are the spec's and must match across every door. These are the five
+// fields that used to be "S1" in Path B, and which Path A did not ask for at
+// all beyond three of them.
+//
+// `key` is the session-state key on state.identity; it is also the suffix of
+// the resolve_company() argument, so the two cannot drift apart.
+// ---------------------------------------------------------------------------
+export const IDENTITY_FIELDS = [
+  { key: 'company', type: 'text', label: 'Company legal name', autoComplete: 'organization' },
+  { key: 'registeredCountry', type: 'text', label: 'Registered country', autoComplete: 'country-name' },
+  { key: 'contactName', type: 'text', label: 'Primary contact name', autoComplete: 'name' },
+  { key: 'contactTitle', type: 'text', label: 'Primary contact title', autoComplete: 'organization-title' },
+  { key: 'contactEmail', type: 'email', label: 'Primary contact email', autoComplete: 'email' },
+]
+
+export const IDENTITY_KEYS = IDENTITY_FIELDS.map((f) => f.key)
 
 export const guidedFieldsFor = (sectionId) =>
   GUIDED_FIELDS.filter((f) => f.section === sectionId)

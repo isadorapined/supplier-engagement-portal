@@ -2,18 +2,24 @@ import { useState } from 'react'
 import { Button } from '@/components/ui/Button'
 import { Card } from '@/components/ui/Card'
 import { Input, Label, Select, Hint } from '@/components/ui/Field'
+import CompanyContact from '@/components/CompanyContact'
 import {
   FlowShell,
+  Notice,
   SectionHeading,
   TransparencyNotice,
   ProblemList,
 } from '@/components/Chrome'
 import { ECOVADIS_QUESTIONS } from '@/lib/ecovadis'
-import { ecovadisFormProblems } from '@/lib/rules'
+import { ecovadisFormProblems, identityProblems } from '@/lib/rules'
 
-// View 3b — Path A door two. The nine EcoVadis questions, no file.
+// View 3b — Path A door two. Two steps in v3.0: the universal Company &
+// Contact step, then the nine EcoVadis questions. Step 2 is exactly Q1–Q9 and
+// carries no identity fields of its own (acceptance criterion 10).
 export default function EcoVadisForm({ state, update, onSubmit, onBack }) {
+  const [step, setStep] = useState(1)
   const [problems, setProblems] = useState([])
+  const [showIdentityProblems, setShowIdentityProblems] = useState(false)
 
   const identity = state.identity
   const answers = state.ecovadisAnswers
@@ -30,71 +36,48 @@ export default function EcoVadisForm({ state, update, onSubmit, onBack }) {
     if (found.length === 0) onSubmit()
   }
 
+  const next = () => {
+    const found = identityProblems(identity)
+    setShowIdentityProblems(true)
+    if (found.length === 0) {
+      setShowIdentityProblems(false)
+      setStep(2)
+      window.scrollTo({ top: 0 })
+    }
+  }
+
+  if (step === 1) {
+    return (
+      <FlowShell>
+        <CompanyContact
+          identity={identity}
+          onChange={setIdentity}
+          onNext={next}
+          onBack={onBack}
+          breadcrumb="Path A · Door two"
+          stepLabel="Step 1 of 2"
+          problems={identityProblems(identity)}
+          showProblems={showIdentityProblems}
+        />
+      </FlowShell>
+    )
+  }
+
   return (
     <FlowShell>
-      <Button variant="back" size="sm" onClick={onBack} className="-ml-3">
-        ← Back
-      </Button>
+      <p className="font-body text-xs font-semibold uppercase tracking-[0.18em] text-clay">
+        Path A · Door two
+      </p>
 
       <SectionHeading
-        overline="Path A · Door two"
+        className="mt-4"
         title="Enter your scorecard details"
         lead="Nine questions about your most recent EcoVadis cycle."
-        className="mt-6"
       />
 
-      <Card className="mt-8 space-y-5">
-        <h3 className="font-heading text-lg font-medium">Your organisation</h3>
-        <div className="grid gap-5 sm:grid-cols-2">
-          <div className="sm:col-span-2">
-            <Label htmlFor="evf-company" required>
-              Company legal name
-            </Label>
-            <Input
-              id="evf-company"
-              className="mt-2"
-              value={identity.company}
-              onChange={(event) => setIdentity('company', event.target.value)}
-            />
-          </div>
-          <div>
-            <Label htmlFor="evf-name" required>
-              Primary contact name
-            </Label>
-            <Input
-              id="evf-name"
-              className="mt-2"
-              value={identity.contactName}
-              onChange={(event) => setIdentity('contactName', event.target.value)}
-            />
-          </div>
-          <div>
-            <Label htmlFor="evf-title" required>
-              Primary contact title
-            </Label>
-            <Input
-              id="evf-title"
-              className="mt-2"
-              value={identity.contactTitle}
-              onChange={(event) => setIdentity('contactTitle', event.target.value)}
-            />
-          </div>
-          <div className="sm:col-span-2">
-            <Label htmlFor="evf-email" required>
-              Primary contact email
-            </Label>
-            <Input
-              id="evf-email"
-              type="email"
-              className="mt-2"
-              value={identity.contactEmail}
-              onChange={(event) => setIdentity('contactEmail', event.target.value)}
-            />
-          </div>
-        </div>
-      </Card>
+      <p className="mt-4 font-body text-sm text-ink">Step 2 of 2</p>
 
-      <Card className="mt-6 space-y-6">
+      <Card className="mt-8 space-y-6">
         <div>
           <h3 className="font-heading text-lg font-medium">Your scorecard</h3>
           <Hint className="mt-1">
@@ -142,11 +125,25 @@ export default function EcoVadisForm({ state, update, onSubmit, onBack }) {
 
       <div className="mt-8 space-y-5">
         <TransparencyNotice />
+        {/* Spec 9.5 — a failed write never reaches View 7. */}
+        <Notice role="alert">{state.saveError}</Notice>
         <div className="flex flex-col gap-3 sm:flex-row">
-          <Button variant="submit" size="lg" onClick={submit} className="w-full sm:w-auto">
-            Submit
+          <Button
+            variant="submit"
+            size="lg"
+            onClick={submit}
+            disabled={state.saving}
+            className="w-full sm:w-auto"
+          >
+            {state.saving ? 'Saving…' : 'Submit'}
           </Button>
-          <Button size="lg" variant="back" onClick={onBack} className="w-full sm:w-auto">
+          {/* Back returns to Step 1, not out of the door. */}
+          <Button
+            size="lg"
+            variant="back"
+            onClick={() => setStep(1)}
+            className="w-full sm:w-auto"
+          >
             Back
           </Button>
         </div>
