@@ -4,10 +4,10 @@
 > anything. Update it at every save point. Replace content — do not append.
 > History lives in git.
 
-**Session:** 5 — v3.1 magic link built; open sign-up blocked by the dashboard's read policies
+**Session:** 5 — v3.1 magic link built; dashboard scoped to reviewers; Auth URLs set
 **Last updated:** 25 September 2026
 **Live URL:** https://the-corporate-sep.netlify.app (Netlify project `the-corporate-sep`, deploys from `main`)
-**Stage:** login and access rules together. Built and gate half A run on 25 September 2026. Half A fails two read cells because of the review dashboard's policies (see Known issues). Half B and cutover not done. This stage isn't absorbed into Current state until both gate halves pass.
+**Stage:** login and access rules together. Built and gate half A run on 25 September 2026. Half A passes after the dashboard was scoped to reviewers. Half B and cutover not done. This stage isn't absorbed into Current state until both gate halves pass.
 **Supabase project:** created — ref `smnrfopzzzhazkehcqqn`, URL `https://smnrfopzzzhazkehcqqn.supabase.co`
 
 ## Current state
@@ -70,18 +70,17 @@ was left untouched, and this is now the blocker on turning sign-up on.
 - [ ] Builder reviews the light nav bar sitting above the dark hero band
 - [ ] Confirm whether the supplier-facing wordmark should stay "Data Leaf" or
       become The Corporate's — the footer already reads "© 2026 The Corporate"
-- [ ] **BLOCKER (builder decision):** the review dashboard's three
-      `authenticated` read-all policies and `set_submission_status` apply to
-      every verified supplier. Until they are limited to dashboard reviewers
-      (or the portal moves to its own Supabase project), turning sign-up on
-      lets any supplier read every other supplier's data and change statuses.
-      See Known issues.
-- [ ] (v3.1 revision) Configure Supabase Auth, builder in the dashboard
-      (no MCP route for auth settings). Email provider on. Site URL
-      `https://the-corporate-sep.netlify.app`. Redirect URLs
-      `https://the-corporate-sep.netlify.app/**` and `http://localhost:5173/**`.
-      "Allow new users to sign up" ON **only after the blocker above is
-      resolved**. Sender: Supabase's built-in mailer (accepted, Known issues).
+- [x] Dashboard read policies and `set_submission_status` scoped to
+      `app_metadata.role = 'reviewer'`; isadorapined@gmail.com flagged as the
+      only reviewer (session 5, builder's decision)
+- [x] Supabase Auth URL Configuration: Site URL and both Redirect URLs set
+      (builder, confirmed by screenshot, 25 Sep)
+- [ ] Builder: log out of the dashboard and back in, so the reviewer claim
+      reaches the token (the dashboard looks empty until then)
+- [ ] Builder: "Allow new users to sign up" ON (now safe), optional Magic
+      Link template rewording
+- [ ] Builder decision: custom SMTP (Resend) before real suppliers. The
+      built-in mailer reaches only Supabase team members
 - [x] (v3.1 revision) Build the three new screens: Verify Your Email, Check
       Your Inbox (with the resend action), Link No Longer Valid; plus Path
       Selection (session 5)
@@ -101,10 +100,8 @@ was left untouched, and this is now the blocker on turning sign-up on.
 - [ ] (v3.1 revision) Tighten `verified_user_id` / `contact_email` to
       `not null` once the three pre-verification rows are deleted (they block
       it; see supabase-setup.md)
-- [~] (v3.1 revision) GATE, half A (Claude Code) — run 25 Sep (below). Every
-      portal rule refuses. **Two cells fail:** `submissions · read` and
-      `companies · read` for Verified Supplier, both because of the dashboard's
-      policies. Re-run after the blocker is resolved and after part 2 is live.
+- [x] (v3.1 revision) GATE, half A (Claude Code) — passes after the reviewer
+      scoping (25 Sep, below). Re-run once more after part 2 is live.
 - [ ] (v3.1 revision) GATE, half B (Isadora, isadorapined@gmail.com) — verify
       her own email end to end, land on Path Selection (not Landing), complete
       one door, confirm the row in the Supabase table editor carries her
@@ -150,6 +147,14 @@ container.
 Not in the matrix but found alongside: `set_submission_status` is executable by
 any `authenticated` session, which means any verified supplier once sign-up is
 on.
+
+**25 September 2026 — half A re-run — Claude Code**, after
+`v31_scope_dashboard_access_to_reviewers`, rolled back. A plain verified
+supplier (piff@gmail.com's id, no reviewer flag) reads 0 submissions, 0
+companies and 0 status-log rows, and `set_submission_status` is refused with
+"Only reviewers can change a submission's status." Its own insert is still
+allowed. A reviewer (isadorapined@gmail.com, flagged) reads every row and gets
+past the reviewer check. **Lines 3 and 4 now pass: every cell passes.**
 
 **Half B (Isadora):** not yet run. It needs the Auth settings, a resolution of
 the blocker, and the deploy.
@@ -246,7 +251,9 @@ the blocker, and the deploy.
   that created it.
 
 ## Known issues
-- **BLOCKER — the review dashboard's read policies apply to suppliers.**
+- **RESOLVED 25 Sep — was: the review dashboard's read policies applied to
+  suppliers.** Fixed by scoping to `app_metadata.role = 'reviewer'`
+  (supabase-setup.md). Original note kept below for the record.
   `authenticated may read companies`, `authenticated may read submissions`,
   `authenticated may read the status log`, and execute on
   `set_submission_status` are all granted to every `authenticated` session. v3.1
@@ -268,10 +275,6 @@ the blocker, and the deploy.
   until a custom SMTP sender (the Resend upgrade path) is configured. So the
   Resend "handover item" is a prerequisite for real suppliers, not an
   optional upgrade. Builder decision pending.
-- Builder chose (25 Sep) fix (a) for the dashboard blocker: scope the
-  dashboard's read policies and `set_submission_status` to accounts flagged
-  `app_metadata.role = 'reviewer'`. Waiting on which accounts are reviewers
-  before applying.
 - Supabase's default "Magic Link" email template says "Follow this link to
   login". It can be reworded in the Supabase dashboard (Authentication →
   Emails) to match the portal's voice. It is shared with the dashboard.
@@ -353,6 +356,7 @@ the blocker, and the deploy.
 - The v3.1 build is on branch `claude/trusting-johnson-v9p8cq`, not on `main`.
   Do not merge it while the dashboard blocker (Known issues) is open and
   sign-up is on.
-- Order at cutover: builder sets the Auth URLs → blocker resolved → sign-up
-  ON → merge → Netlify deploys → apply part 2 (`supabase/pending/`) at once →
-  re-run half A → Isadora runs half B.
+- Order at cutover: builder sets the Auth URLs (done) → reviewer fix (done) →
+  sign-up ON → merge → Netlify deploys → apply part 2 (`supabase/pending/`) at
+  once → re-run half A → Isadora runs half B. Real suppliers additionally need
+  custom SMTP.
