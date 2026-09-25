@@ -7,11 +7,14 @@
 **Session:** 4 — portal live and persisting; two deployment faults found and fixed
 **Last updated:** 11 September 2026
 **Live URL:** https://the-corporate-sep.netlify.app (Netlify project `the-corporate-sep`, deploys from `main`)
+**Stage:** login and access rules together — access-matrix.md and user-stories.md (full run) are in, and CLAUDE.md was regenerated for v3.1 on 24 September 2026; this stage isn't absorbed into Current state until the access phase below is built and both gate halves pass.
+**Supabase project:** created — ref `smnrfopzzzhazkehcqqn`, URL `https://smnrfopzzzhazkehcqqn.supabase.co`
 
 ## Current state
 v3.0 is built and passing the full local test pass — 49 parser checks and three
-browser suites, all green. The tool is now Tier 2: every completed submission
-is written to Supabase and linked to a reusable company record.
+browser suites, all green. The tool is Tier 2 as deployed today: every completed
+submission is written to Supabase and linked to a reusable company record, with no
+login in front of it yet.
 
 Database is live in the **existing** Supabase project "The Corporate"
 (`smnrfopzzzhazkehcqqn`, us-east-1, Free). `companies` and `submissions` are
@@ -19,10 +22,10 @@ built with RLS on both. `companies` carries **no anon policy at all** — suppli
 contact details cannot be read from the browser — and all access to it goes
 through `resolve_company()`, a `SECURITY DEFINER` function that does the
 match-or-insert server-side and returns only a company id. `submissions` is
-insert-only. Every one of those restrictions was verified by querying as the
-anon role: companies returns 0 rows with rows present, a direct insert is
-refused, and anon delete/update affect nothing. docs/supabase-setup.md is the
-schema source of truth.
+insert-only, currently open to `anon` with `check (true)` — this is exactly what
+the v3.1 access phase below closes. docs/supabase-setup.md is the schema source
+of truth (as of 11 September 2026 — still to be updated once the v3.1 access
+phase touches the database).
 
 All four doors open with the same five-field Company & Contact step, rendered
 from one `CompanyContact` component and gated by one `identityProblems()` — so
@@ -32,44 +35,17 @@ Declaration), the parser reads 28 rows instead of 30, and both Path B
 denominators are 28. View 3a's step 2 is exactly three fields plus the file
 picker; View 3b's is exactly Q1–Q9.
 
-The transparency notice now reads "Your information is stored for The
-Corporate's review." It changed in the same commit that added the database
-write, because either alone makes it false.
-
-Files are still never stored — only filename and size reach the database. The
-browser suites now assert that on the request bodies themselves, since the old
-"no request leaves the page" assertion stopped being true this version.
+The transparency notice reads "Your information is stored for The Corporate's
+review." Files are still never stored — only filename and size reach the database.
 
 ## Last session
 Builder reported completing a submission on the live site with nothing arriving
-in the database. Traced it: the code was never the problem. v3.0 was committed
-to `claude/ecstatic-dijkstra-zwahfk` and left sitting in **open PR #2** — never
-merged. Netlify deploys from `main`, and `main` was still v2.1, whose `submit()`
-sets the confirmation view and fires no network request at all. The supplier saw
-a normal confirmation screen; nothing had been sent, exactly as v2.1 was built
-to behave. Both tables read 0 rows, consistent.
-
-Verified the database half is sound and needs no work: `companies` and
-`submissions` exist with RLS on, `resolve_company()` is SECURITY DEFINER with
-EXECUTE granted to `anon`, and the single `submissions` INSERT policy for `anon`
-is the only policy in `public` — the intended shape. Builder merged PR #2 during
-the session (`main` now at 812c740) and redeployed with both Netlify environment
-variables set.
-
-That surfaced a second, unrelated fault. The submission still failed, and the
-edge logs showed **no inbound request at all** — not a rejection, nothing. The
-browser console named it: `resolve_company failed` carrying
-`TypeError: Failed to execute 'set' on 'Headers': String contains non ISO-8859-1
-code point.` The variables were configured correctly all along (right names, All
-scopes, same value in all deploy contexts); the anon key's *value* carried a
-character outside Latin-1, so `Headers.set()` threw while building the `apikey`
-header and the request was never sent. Almost certainly an ellipsis picked up by
-copying a key from a display that truncates it. Fix is the short
-`sb_publishable_...` key copied with the dashboard copy button, then a no-cache
-redeploy. Applied, and **the portal now works end to end**: a live submission at
-14:53 UTC wrote both rows — company `isa` and a linked `full` /
-`assessment_upload` submission carrying 28 answers, the attached filename and
-size, and the declaration. Criterion 20's persistence half is met.
+in the database. Traced it to v3.0 sitting unmerged in open PR #2 while `main`
+was still v2.1. Merged, redeployed with both Netlify environment variables set,
+found and fixed a second fault (a non-ISO-8859-1 character in the copied anon
+key value broke `Headers.set()` before any request left the browser), and
+confirmed a live submission at 14:53 UTC wrote both rows correctly. Criterion
+20's persistence half is met.
 
 ## Remaining work
 - [x] Netlify environment variables set and inlined by a fresh build; live
@@ -87,6 +63,43 @@ size, and the declaration. Criterion 20's persistence half is met.
 - [ ] Builder reviews the light nav bar sitting above the dark hero band
 - [ ] Confirm whether the supplier-facing wordmark should stay "Data Leaf" or
       become The Corporate's — the footer already reads "© 2026 The Corporate"
+- [ ] (v3.1 revision) Configure Supabase Auth for magic link: "Enable sign-ups"
+      ON, email OTP/magic link flow enabled, no password flow. Sender is
+      Supabase's built-in auth mailer (accepted for testing-scale traffic —
+      see Known Issues).
+- [ ] (v3.1 revision) Build the three new screens: Verify Your Email, Check
+      Your Inbox (with the resend action), Link No Longer Valid
+- [ ] (v3.1 revision) Update the `CompanyContact` component so `contact_email`
+      is sourced from the verified session (`auth.email()`) and read-only on
+      all four doors; every other field stays free text
+- [ ] (v3.1 revision) Access phase — login and rules together, one build,
+      per docs/access-matrix.md: add `submissions.verified_user_id uuid not
+      null default auth.uid() references auth.users(id)` (named migration);
+      change the `submissions` INSERT policy from `anon`/`check (true)` to
+      `authenticated` with `WITH CHECK (contact_email = auth.email() AND
+      verified_user_id = auth.uid())`; move `resolve_company()`'s execute
+      grant from `anon` to `authenticated`; update docs/supabase-setup.md in
+      the same save point
+- [ ] (v3.1 revision) GATE, half A (Claude Code) — through the API directly:
+      attempt a `submissions` insert as `anon` (must refuse), an authenticated
+      insert with a mismatched `contact_email` (must refuse), a `companies`
+      call as any role (must refuse), and `resolve_company()` as `anon` (must
+      refuse); paste every result into Refusal test record below
+- [ ] (v3.1 revision) GATE, half B (Isadora, isadorapined@gmail.com) — verify
+      her own email end to end, land on Path Selection (not Landing), complete
+      one door, confirm the row in the Supabase table editor carries her
+      `contact_email` and a `verified_user_id` matching her `auth.users` row.
+      Both halves must pass before this stage deploys.
+- [ ] (v3.1 revision) Local test pass — full walkthrough including the new
+      verification flow, an expired/reused link, and the resend action
+- [ ] (v3.1 revision) Acceptance criteria pass — verify criteria 21–28
+      (existing criteria 1–20 already covered)
+- [ ] (v3.1 revision) Push to main → Netlify auto-deploys
+
+## Refusal test record
+None yet. Filled by Claude Code at half A and by Isadora at half B (date, who,
+cell tried, result). Kept, never cleared. Any future change to a rule re-runs
+both halves before the next push.
 
 ## Build decisions
 - Reused the existing Supabase project "The Corporate" rather than creating
@@ -122,14 +135,11 @@ size, and the declaration. Criterion 20's persistence half is met.
   idiom (cva variants, a `cn` merge helper) rather than generated by the CLI,
   which needs interactive network access unavailable in the build session.
 - Button variants are named for behaviour, not colour — `submit` is Deep Teal,
-  `nav` is Burnt Clay, `back` is plain Deep Space Blue text. The Company &
-  Contact step's "Next" is `nav`: it navigates, it does not submit.
-- The six choice cards render through one `ChoiceCard` in `Chrome.jsx`. Spec
-  10.3 requires the path cards and both door choosers to be the same object.
+  `nav` is Burnt Clay, `back` is plain Deep Space Blue text.
+- The six choice cards render through one `ChoiceCard` in `Chrome.jsx`.
 - Door chooser overlines read "Door one" / "Door two".
 - The "What Happens Next" section background moved from Silver to Mint Cream.
-- `hoverOnlyWhenSupported` is set in `tailwind.config.js`, which implements
-  10.6's "no tap-state substitute on touch" for the timeline.
+- `hoverOnlyWhenSupported` is set in `tailwind.config.js` for the timeline.
 - Keyboard focus keeps the Burnt Clay `:focus-visible` outline from
   `index.css`. 10.4's "no outline" governs the resting field, not focus.
 - Question ids carry a `data-qid` attribute and identity fields a
@@ -141,42 +151,28 @@ size, and the declaration. Criterion 20's persistence half is met.
   fetched when a supplier actually opens the upload door.
 - `.xlsx` uploads are checked for a ZIP signature before parsing.
 - The browser suites stub the two Supabase calls rather than hitting the
-  database, so they stay offline and deterministic — and criterion 11 is now
-  checked on the request bodies, which is stronger than the old request count.
+  database, so they stay offline and deterministic.
+- (v3.1 revision) Magic link, not email+password, chosen for the login: this is
+  an open, unvetted-supplier context, not an admin-managed list — magic link
+  needs no passwords to manage and fits open signup directly.
+- (v3.1 revision) `verified_user_id` added to `submissions` rather than a
+  `profiles` table: one undifferentiated role with no admin flag needs no
+  profile row, just a durable, non-spoofable link from the row to the session
+  that created it.
 
 ## Known issues
 - **A corrupted API key value fails with no server-side trace whatsoever.**
-  Worth knowing, because the symptom points at the database and the cause is a
-  clipboard. If `VITE_SUPABASE_ANON_KEY` contains any character outside
-  ISO-8859-1 — an ellipsis, a smart quote, an en dash — supabase-js throws
-  `TypeError: Failed to execute 'set' on 'Headers'` while building the `apikey`
-  header, *before* the request leaves the browser. Supabase logs stay empty,
-  both tables stay at 0 rows, and the supplier sees the ordinary save-failure
-  notice. It looks identical to a database or policy problem and is neither.
-  The usual source is copying a key from a UI that truncates the display with a
-  real `…` character; the Supabase dashboard's API Keys page does exactly that.
-  Always use its copy button, never a mouse selection. Diagnosing this took a
-  browser console — `submit.js` logs a distinct message for each failure mode,
-  so read the console before touching the database.
-- **Netlify env vars are inlined at build time, so a rebuild is mandatory.**
-  Saving `VITE_SUPABASE_URL` or `VITE_SUPABASE_ANON_KEY` does nothing to a
-  bundle that already exists — Vite pastes the values in during `npm run build`.
-  After any change to either, trigger "Deploy project without cache" (Netlify's
-  new name for "Clear cache and deploy site"). Leave "Contains secret values"
-  unticked on both: the anon key is meant to ship inside the bundle, and marking
-  it secret can make Netlify's secrets scanner fail the build for finding it.
-- **Work reaches `main` only by merging a PR, not by pushing.** CLAUDE.md's save
-  point says "commit and push to main", but these sessions push to a `claude/*`
-  branch that then needs merging. v3.0 sat unmerged for a day because of this,
-  and it is what made a finished build look like a broken database. Treat a save
+  If `VITE_SUPABASE_ANON_KEY` contains any character outside ISO-8859-1 — an
+  ellipsis, a smart quote, an en dash — supabase-js throws before the request
+  leaves the browser. Always use the Supabase dashboard's copy button, never a
+  mouse selection.
+- **Netlify env vars are inlined at build time, so a rebuild is mandatory**
+  after any change to either Supabase variable — trigger "Deploy project
+  without cache". Leave "Contains secret values" unticked on both.
+- **Work reaches `main` only by merging a PR, not by pushing.** Treat a save
   point as incomplete until the PR is merged and Netlify has deployed.
-- ~~The live HTTP round trip to Supabase is unverified.~~ **Closed in session
-  4.** A real submission from the deployed site wrote both rows as specified.
-  `tests/persistence.test.mjs` still has not been run from an unproxied machine,
-  but the thing it stands in for has now been observed directly.
 - Free plan pauses after roughly a week without traffic, and a paused project
-  refuses writes. Suppliers would see the save-failure notice. Most likely real
-  cause of a failed submission.
+  refuses writes. Most likely real cause of a failed submission.
 - No Data Leaf logo file. The wordmark renders as DM Sans Medium type in Deep
   Space Blue — flag for replacement if a logo arrives.
 - The nav bar sits directly above the dark hero band; builder review pending.
@@ -190,26 +186,49 @@ size, and the declaration. Criterion 20's persistence half is met.
   the shipped `.xlsx`. If the template is ever corrected, the `templateText`
   strings in `src/lib/questions.js` must be updated to match.
 - The shipped template still contains its two S1 rows. They are simply not read
-  any more. The template is not reissued, so a supplier completing it offline
-  will still fill in identity cells that the portal ignores in favour of the
-  Company & Contact step. Worth reissuing the workbook at some point.
-- `xlsx@0.18.5` is still the newest build on the npm registry (re-checked this
-  session: `latest` resolves to 0.18.5) and carries two open advisories.
-  SheetJS's fixed 0.20.x is served only from `cdn.sheetjs.com`, which the build
-  environment blocks. Exposure is limited: parsing runs on a file the visitor
-  chose themselves, the 10 MB cap is applied before any parse, and
-  `sheet_to_json` is called with `header: 1`. Worth revisiting from an
-  unproxied machine.
+  any more.
+- `xlsx@0.18.5` is still the newest build on the npm registry and carries two
+  open advisories. SheetJS's fixed 0.20.x is served only from
+  `cdn.sheetjs.com`, which the build environment blocks. Exposure is limited:
+  parsing runs on a file the visitor chose themselves, the 10 MB cap is applied
+  before any parse, and `sheet_to_json` is called with `header: 1`.
 - The v1.0 template row 18 carries an internal note in its NOTES / EVIDENCE cell
   ("AUTO-FLAG: Yes triggers PFAS Risk review"). It parses as that question's
   notes and shows in the review table.
 - Supabase's linter reports two findings — `rls_enabled_no_policy` on
   `companies` (INFO) and `anon_security_definer_function_executable` on
-  `resolve_company` (WARN). Both are intentional and are the design working.
-  See docs/supabase-setup.md before "fixing" either.
+  `resolve_company` (WARN, and will read differently once execute moves to
+  `authenticated` in the v3.1 build — re-check the linter after that change).
 - Playwright 1.63 expects a Chromium build newer than the one installed in the
-  build environment. The browser suites need
-  `CHROME_PATH=/opt/pw-browsers/chromium-1194/chrome-linux/chrome`.
+  build environment; needs `CHROME_PATH=/opt/pw-browsers/chromium-1194/chrome-linux/chrome`.
+- Spec revised to v3.1 on 24 September 2026 — CLAUDE.md regenerated by Project
+  Governor. Adds email verification (magic link), promotes Tier 2 → Tier 3.
+- Supabase's built-in auth mailer (not a Resend-verified domain) has a low
+  send rate — explicitly accepted for current testing-scale traffic. Move to a
+  verified sending domain if real supplier volume arrives (see Backlog).
+
+## Backlog
+- Handover: login upgrade path — same magic link mechanism, moved onto a
+  Resend-verified sending domain (~$10/year, one-time domain setup) once real
+  supplier volume needs it. Nothing about the flow or the rules changes.
+- Cross-device magic link handling (started on one device, opened on another)
+  — confirmed acceptable; suppliers are told to open the link on the same
+  device they started on.
+- Password-based login of any kind, and a Change Password screen — not
+  applicable, no passwords exist in this build.
+- Any account settings, profile, or "my submissions" screen — not requested;
+  a verified session exists only to gate one submission.
+- Persistent sessions across return visits — each submission attempt verifies
+  fresh; this is not a login suppliers are expected to reuse.
+- Restricting who may verify or submit — explicitly out of scope; open signup
+  is the whole design (validation, not gatekeeping).
+- `resolve_company()`'s own parameters are not checked against `auth.email()`
+  — an authenticated caller could still overwrite an existing company's
+  contact fields with arbitrary values by passing a matching legal name.
+  Pre-existing since v3.0 under `anon`; unaffected by this iteration. Flag for
+  a future spec if it ever matters.
+- No admin role, no withdraw/reinstate/anonymise mechanism — GDPR confirmed
+  not applicable for this class/portfolio project; revisit if that changes.
 
 ## Notes for next session
 None.
