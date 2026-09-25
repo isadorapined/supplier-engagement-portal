@@ -10,9 +10,16 @@ import { ECOVADIS_IDS } from './ecovadis.js'
 //      only the company id. `companies` has no anon RLS policy, so this
 //      function is the client's sole route to it, and no other company's
 //      details can ever come back.
-//   2. insert into submissions — insert-only for anon. Note there is no
-//      .select() chained: the policy would refuse it. View 7 is rendered from
-//      in-browser state, never from a read-back.
+//   2. insert into submissions — insert-only, and from v3.1 only for a
+//      verified session. `verified_user_id` and `contact_email` are not sent:
+//      the database fills them from the session (defaults auth.uid() and
+//      auth.email()) and the INSERT policy refuses any row where they do not
+//      match it, so the client cannot claim another identity. No .select()
+//      is chained — the portal never reads a row back; View 7 is rendered
+//      from in-browser state.
+//
+// Both calls carry the verified session's token, which supabase-js attaches
+// on its own. anon can make neither call after v3.1.
 
 // Spec 9.5. The message a supplier sees when a write fails. Burnt Clay body
 // text, no panel, no icon (10.6). Says plainly that nothing was sent, because

@@ -23,6 +23,7 @@ page.on('request', (r) => {
   if (u.startsWith(BASE) || u.startsWith('data:') || u.startsWith('blob:')) return
   if (u.includes('fonts.googleapis.com') || u.includes('fonts.gstatic.com')) return
   if (u.includes('/rest/v1/')) return // Supabase, expected from v3.0 on
+  if (u.includes('/auth/v1/')) return // Supabase Auth (v3.1), stubbed
   escaped.push(`${r.method()} ${u}`)
 })
 
@@ -179,6 +180,8 @@ check('"Step 1" is at the top of the viewport', Math.abs(scrolled.targetTop) < 4
 check('still on the landing page', await page.getByRole('heading', { name: 'Key Resources' }).isVisible(), true)
 
 // --- Criteria 4 and 7: both door choosers ---
+// v3.1: the path cards sit behind a verified email. Arrive by magic link.
+await sb.verify(BASE)
 await page.getByRole('button', { name: 'Submit EcoVadis Scorecard' }).click()
 check('View 2 opens', await page.getByRole('heading', { name: 'EcoVadis Scorecard' }).isVisible(), true)
 check('two EcoVadis doors, neither gated',
@@ -308,10 +311,12 @@ check('criterion 4 — the door value written was ecovadis_form',
 check('deadline restated', (await page.content()).includes('30 September 2026'), true)
 
 // --- Criterion 13: "Start another submission" clears the browser only ---
-const callsBeforeRestart = sb.calls.length
+const callsBeforeRestart = sb.writes()
 await page.getByRole('button', { name: 'Start another submission' }).click()
 check('criterion 13 — restart writes nothing to the database',
-  sb.calls.length, callsBeforeRestart)
+  sb.writes(), callsBeforeRestart)
+// The session ended when the submission saved, so the next one verifies afresh.
+await sb.verify(BASE)
 await page.getByRole('button', { name: 'Submit EcoVadis Scorecard' }).click()
 await page.getByRole('button', { name: 'Enter your scorecard details' }).click()
 check('identity cleared', await page.inputValue('[data-identity="company"]'), '')

@@ -51,8 +51,12 @@ export function Checkbox({ className, label, ...props }) {
   )
 }
 
-export function Hint({ children, className }) {
-  return <p className={cn('font-body text-xs text-ink', className)}>{children}</p>
+export function Hint({ children, className, ...props }) {
+  return (
+    <p className={cn('font-body text-xs text-ink', className)} {...props}>
+      {children}
+    </p>
+  )
 }
 
 // The ESRS reference and question id that sit beside a question. Deep Teal,

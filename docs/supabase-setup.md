@@ -4,7 +4,7 @@
 > schema in CLAUDE.md from the moment it exists. Update it at every save point
 > that touches the database — a table, a column, a policy, or a function.
 
-**Last updated:** 11 September 2026 — session 3
+**Last updated:** 25 September 2026 — session 5 (v3.1 access phase, part 1 applied; part 2 pending cutover)
 
 ---
 
@@ -71,8 +71,8 @@ simultaneous submissions from the same company cannot both insert a row.
 
 ### `submissions`
 
-One completed submission per row. A company has many submissions. Insert-only
-for the anon key.
+One completed submission per row. A company has many submissions. Insert-only,
+and from v3.1 only for a verified session (`authenticated`).
 
 | Column | Type | Null | Default | Notes |
 |--------|------|------|---------|-------|
@@ -86,6 +86,23 @@ for the anon key.
 | `signatory_name` | `text` | yes | — | Path B only |
 | `declaration_date` | `date` | yes | — | Path B only |
 | `submitted_at` | `timestamptz` | no | `now()` | |
+| `status` | `text` | no | `'new'` | **Owned by the review dashboard**, not this portal — see *Shared with the review dashboard*. Check: `new` \| `accepted` \| `needs_review` \| `superseded`. The portal never sets it; its INSERT policy requires `'new'`. |
+| `verified_user_id` | `uuid` | yes\* | `auth.uid()` | v3.1. FK → `auth.users.id`. The verified session that inserted the row. Never sent by the client. |
+| `contact_email` | `text` | yes\* | `auth.email()` | v3.1. The verified session's email. Never sent by the client. |
+
+\* Nullable in the column definition only because three rows written before
+v3.1 have no verified identity. Every row inserted through the app is forced
+non-null by the INSERT policy (`null = auth.uid()` is never true).
+docs/access-matrix.md §5 asks for `not null`; that is deferred until those
+three pre-verification rows are removed, after which
+`alter column … set not null` can be applied. A `NOT VALID` check was
+rejected: Postgres still checks it when an old row is updated, which would
+break the dashboard's status changes on those rows.
+
+`contact_email` on `submissions` is also a v3.1 addition the access matrix
+implies but its §5 schema delta does not list: the matrix's policy (§6 line 1)
+and criterion 28 both check `submissions.contact_email`, and before v3.1 that
+column existed only on `companies`.
 
 **Indexes**
 
@@ -102,7 +119,7 @@ for the anon key.
 
 ## RLS
 
-**RLS is enabled on both tables and must never be disabled.** If a query fails,
+**RLS is enabled on every table and must never be disabled.** If a query fails,
 fix the policy or the query.
 
 > **The spec was wrong about this and was corrected during the build.** v3.0 §6
@@ -114,33 +131,92 @@ fix the policy or the query.
 > alter, or delete every other supplier's submission. RLS is required on any
 > table the anon key can reach, at every tier, login or no login.
 
+### Portal policies (this repo)
+
+| Table | Policy | Role | Command | State |
+|-------|--------|------|---------|-------|
+| `submissions` | `verified supplier may insert own submission` | `authenticated` | `INSERT` with check `contact_email = auth.email() and verified_user_id = auth.uid() and status = 'new'` | **live** (v3.1 part 1) |
+| `submissions` | `anon may insert a submission` | `anon` | `INSERT` with check `status = 'new'` | live until cutover — **dropped by v3.1 part 2** |
+| `companies` | *(none from the portal — deliberately)* | — | — | — |
+
+The `status = 'new'` term is stricter than access-matrix.md §6 line 1 asks
+for. It carries over the condition the dashboard added to the anon policy, so
+a supplier cannot insert a row that is already marked as accepted.
+
+`companies` has no portal policy. Before v3.1 that denied anon everything;
+supplier contact details were unreadable from the browser and the only route
+in was `resolve_company()` below. **This no longer holds for `authenticated`**:
+see the next section.
+
+### Dashboard policies (reviewer-scoped since 25 Sep 2026)
+
 | Table | Policy | Role | Command |
 |-------|--------|------|---------|
-| `companies` | *(none — deliberately)* | — | — |
-| `submissions` | `anon may insert a submission` | `anon` | `INSERT` with check `true` |
+| `companies` | `reviewer may read companies` | `authenticated` | `SELECT` using `app_metadata.role = 'reviewer'` |
+| `submissions` | `reviewer may read submissions` | `authenticated` | `SELECT` using `app_metadata.role = 'reviewer'` |
+| `submission_status_changes` | `reviewer may read the status log` | `authenticated` | `SELECT` using `app_metadata.role = 'reviewer'` |
 
-`companies` has RLS on and **no policy at all**, which denies every anon
-select, insert, update and delete. Supplier contact details are therefore
-unreadable from the browser. The only route in is `resolve_company()` below.
+The dashboard wrote these as `using (true)` for every `authenticated` session,
+back when only its own logins existed. In v3.1 every verified supplier is also
+`authenticated`, so on the builder's decision they were rewritten in
+`v31_scope_dashboard_access_to_reviewers` to require the JWT claim
+`app_metadata.role = 'reviewer'`.
+
+**Reviewers.** The flag lives in `auth.users.raw_app_meta_data`, which only the
+service role can write, so a supplier cannot flag themselves. It is set by
+hand. Current reviewers: `isadorapined@gmail.com`.
+
+To add a reviewer, run this in the Supabase SQL editor:
+```sql
+update auth.users
+   set raw_app_meta_data = raw_app_meta_data || '{"role":"reviewer"}'
+ where email = 'someone@example.com';
+```
+To remove one, subtract the key: `raw_app_meta_data - 'role'`.
+The claim reaches the JWT at the reviewer's next sign-in, so they must log out
+of the dashboard and back in.
 
 Supabase's linter reports this as `rls_enabled_no_policy` (INFO) — that finding
 is expected and intentional here, not a gap to close.
 
-Because `submissions` is insert-only, the client cannot read back the row it
-just wrote: a `.insert().select()` chain is refused by the policy. The
-confirmation screen (View 7) is rendered from in-browser state instead. Do not
-"fix" this by adding a select policy.
+The portal never reads a row back. The confirmation screen (View 7) is rendered
+from in-browser state. Do not add a select policy for the portal.
 
-### Verified behaviour, as the `anon` role
+### Verified behaviour — 25 September 2026, with part 2 applied in a rolled-back transaction
 
-| Attempt | Result |
-|---------|--------|
-| `select` from `companies` | 0 rows, even with rows present |
-| `insert` into `companies` directly | refused — `new row violates row-level security policy` |
-| `delete` from `companies` | 0 rows affected |
-| `insert` into `submissions` | succeeds |
-| `select` from `submissions` | 0 rows |
-| `update` / `delete` on `submissions` | 0 rows affected |
+Run as SQL with `set role` and `request.jwt.claims`, which puts the same
+policies and grants in the path as an API call. The Supabase API was not
+reachable from the build container. The full record is in PROGRESS.md.
+
+| Role | Attempt | Result |
+|------|---------|--------|
+| `anon` | `insert` into `submissions` | refused — `permission denied for table submissions` |
+| `anon` | `select` / `delete` on `submissions` | refused — permission denied |
+| `anon` | `select` / `insert` / `update` on `companies` | refused — permission denied |
+| `anon` | `resolve_company()` | refused — `permission denied for function resolve_company` |
+| `authenticated` | `resolve_company()` | allowed |
+| `authenticated` | insert with another `contact_email` | refused — `new row violates row-level security policy` |
+| `authenticated` | insert with another `verified_user_id` | refused — RLS |
+| `authenticated` | insert with `status = 'accepted'` | refused — RLS |
+| `authenticated` | insert with defaults (own identity) | allowed |
+| `authenticated` | `update` / `delete` on `submissions` or `companies` | 0 rows affected |
+| `authenticated` | direct `insert` into `companies` | refused — RLS |
+| `authenticated` | `select` from `submissions` | every row visible (dashboard policy); fixed below |
+| `authenticated` | `select` from `companies` | every row visible (dashboard policy); fixed below |
+
+**Re-run after `v31_scope_dashboard_access_to_reviewers`** (rolled back):
+
+| Caller | Attempt | Result |
+|--------|---------|--------|
+| supplier (no reviewer flag) | `select` `submissions` / `companies` / status log | 0 / 0 / 0 rows |
+| supplier | `set_submission_status` | refused — only reviewers |
+| supplier | own insert | allowed |
+| reviewer | `select` `submissions` / `companies` / status log | every row |
+| reviewer | `set_submission_status` | past the reviewer check (stopped by the row's own state rule) |
+
+Until part 2 is applied, the live `anon` behaviour is still the v3.0 behaviour.
+`anon` can insert into `submissions` and call `resolve_company()`, so the live
+v3.0 portal keeps working until the v3.1 portal is deployed.
 
 ---
 
@@ -148,9 +224,10 @@ confirmation screen (View 7) is rendered from in-browser state instead. Do not
 
 ### `public.resolve_company(p_legal_name, p_registered_country, p_contact_name, p_contact_title, p_contact_email) → uuid`
 
-`SECURITY DEFINER`, `set search_path = public, pg_temp`. Execute granted to
-`anon` only — explicitly revoked from `public` and from `authenticated`, since
-this build has no authenticated users.
+`SECURITY DEFINER`, `set search_path = public, pg_temp`. From v3.1, execute is
+granted to `authenticated` (part 1, live). v3.1 part 2 revokes it from `anon`
+and `public` at cutover. Until then `anon` still holds it, for the live v3.0
+portal.
 
 Implements spec §5's matching rule server-side:
 
@@ -166,7 +243,27 @@ Implemented as a single `INSERT … ON CONFLICT … DO UPDATE`, which is what ma
 it atomic against concurrent submissions.
 
 The Supabase linter reports `anon_security_definer_function_executable` (WARN)
-for this function. That is intentional — anon calling it is the entire design.
+for this function until part 2 is applied, and
+`authenticated_security_definer_function_executable` (WARN) after. The second
+is intentional: a verified supplier calling it is the design.
+
+The function's parameters are not checked against `auth.email()`. A verified
+supplier can still overwrite an existing company's contact fields by passing a
+matching legal name. This is carried over from v3.0 and is on the Backlog
+(access-matrix.md §4).
+
+### Dashboard functions (not managed from this repo)
+
+- `set_submission_status(p_submission_id, p_new_status, p_reason)` —
+  `SECURITY DEFINER`, execute granted to `authenticated`. Sets `accepted` /
+  `needs_review` and logs to `submission_status_changes`. Since 25 Sep 2026
+  it raises `DL403` "Only reviewers can change a submission's status." unless
+  the caller carries `app_metadata.role = 'reviewer'`. The body is otherwise
+  unchanged.
+- `supersede_previous_submissions()` — `SECURITY DEFINER` trigger function,
+  `AFTER INSERT` on `submissions`. Marks earlier rows from the same company
+  and path as `superseded`. Portal inserts fire it. It swallows its own
+  errors, so it can never block a submission.
 
 ---
 
@@ -177,6 +274,34 @@ for this function. That is intentional — anon calling it is the entire design.
 | `v3_companies_submissions_schema` | Both tables, constraints, indexes, comments |
 | `v3_rls_and_resolve_company` | RLS on both tables, the submissions insert policy, `resolve_company` |
 | `v3_restrict_resolve_company_to_anon` | Revoked execute from `authenticated` (least privilege) |
+| `dashboard_v1_*` (six, 18 Sep 2026) | **Review dashboard, not this repo.** `submission_status_changes`, `submissions.status`, the superseding trigger, `set_submission_status`, the three `authenticated` read policies, and `status = 'new'` added to the anon insert policy |
+| `v31_verified_supplier_insert_path` (25 Sep 2026) | v3.1 part 1: `submissions.verified_user_id` and `submissions.contact_email`; `authenticated` INSERT policy; execute on `resolve_company` granted to `authenticated`. File: `supabase/migrations/20260925010620_v31_verified_supplier_insert_path.sql` |
+| `v31_scope_dashboard_access_to_reviewers` (25 Sep 2026) | The dashboard's three read policies and `set_submission_status` now require `app_metadata.role = 'reviewer'`. Applied on the builder's instruction. File: `supabase/migrations/20260925013409_v31_scope_dashboard_access_to_reviewers.sql` |
+| *pending* `v31_close_anon_write_path` | v3.1 part 2, **not yet applied**: drops the anon insert policy; revokes `resolve_company` from `anon` and `public`; revokes all `anon` table grants on `submissions` and `companies`. File: `supabase/pending/v31_close_anon_write_path.sql`. Apply at cutover, right after the v3.1 portal deploys. Once applied, the live v3.0 build cannot submit. |
+
+---
+
+## Auth (v3.1)
+
+Magic link (passwordless), through Supabase Auth's own mailer. There is no
+Email Arm. Settings the portal needs, in Supabase → Authentication:
+
+| Setting | Value | Why |
+|---------|-------|-----|
+| Email provider | enabled | the magic link |
+| Allow new users to sign up | **ON** — safe since the reviewer scoping (25 Sep) | open self-verification is the design; `shouldCreateUser: true` fails without it |
+| Site URL | `https://the-corporate-sep.netlify.app` | where a link returns by default — **set, confirmed 25 Sep** |
+| Redirect URLs | `https://the-corporate-sep.netlify.app/**`, `http://localhost:5173/**` | the portal passes `emailRedirectTo: <origin>/` and Supabase refuses redirects not listed here — **set, confirmed 25 Sep** |
+| Sender | Supabase built-in mailer | **delivers only to members of the Supabase organisation's team**, a few per hour. Fine for testing with the builder's address; real suppliers need a custom SMTP sender (Resend) |
+
+The client uses `flowType: 'implicit'`, `persistSession: false`,
+`autoRefreshToken: true`. The session lives in the tab's memory only, and
+nothing is written to localStorage. It ends when the submission saves. An
+expired or used link returns `#error=…&error_code=otp_expired`, which the
+portal shows as Link No Longer Valid.
+
+These settings are shared with the review dashboard, which logs in through
+the same Auth.
 
 ---
 
@@ -213,14 +338,14 @@ successful submission from that company matches the same row.
 ## Reviewing submissions
 
 Directly in the Supabase table editor, which uses the service role and bypasses
-RLS. There is no review UI in the portal and none is planned before v4, since
-that would need login.
+RLS, or in the separate review dashboard. The portal has no review UI.
 
 A useful starting query:
 
 ```sql
 select c.legal_name, c.registered_country, c.contact_email,
-       s.path, s.door, s.submitted_at, s.answers
+       s.contact_email as verified_email, s.verified_user_id,
+       s.path, s.door, s.status, s.submitted_at, s.answers
 from public.submissions s
 join public.companies c on c.id = s.company_id
 order by s.submitted_at desc;
@@ -233,11 +358,19 @@ order by s.submitted_at desc;
 - **Never disable RLS** to unblock a query. Fix the policy or the query.
 - **Never add a select policy to `companies`.** If something needs company data,
   add a `SECURITY DEFINER` function that returns only what it needs.
-- Adding auth (v4) means granting `execute` on `resolve_company` to
-  `authenticated` explicitly — it was revoked on purpose.
+- `resolve_company` execute moved to `authenticated` in v3.1. Part 2 removes
+  `anon` at cutover.
+- The dashboard's tables, policies and functions share this schema. Portal
+  migrations must not alter them without the builder's say-so. The one
+  sanctioned change so far is the reviewer scoping (25 Sep).
 - `answers` is schemaless by design. Question ids come from
   `src/lib/questions.js`; if those ids ever change, historical rows keep the old
   keys. Prefer adding ids over renaming them.
-- The two linter findings above (`rls_enabled_no_policy` on `companies`,
-  `anon_security_definer_function_executable` on `resolve_company`) are both
-  intentional. Do not "resolve" them without re-reading this file.
+- Linter, 25 Sep 2026: `anon_security_definer_function_executable` on
+  `resolve_company` (clears at part 2);
+  `authenticated_security_definer_function_executable` on `resolve_company`
+  and on `set_submission_status` (both intentional; the latter checks the
+  reviewer claim itself);
+  `auth_leaked_password_protection` (passwords only, i.e. the dashboard's
+  login, not the portal's). `rls_enabled_no_policy` on `companies` no longer
+  shows, because the dashboard added a read policy.

@@ -1,6 +1,7 @@
 import { Button } from '@/components/ui/Button'
 import { Card } from '@/components/ui/Card'
-import { Nav, Footer, ChoiceCard, SCOPE3_NOTE } from '@/components/Chrome'
+import { Nav, Footer, SCOPE3_NOTE } from '@/components/Chrome'
+import PathCards from '@/components/PathCards'
 
 const STATS = [
   { figure: '690,000', label: 'tCO₂e Total Footprint (2023, location-based)' },
@@ -143,25 +144,15 @@ export default function Landing({ onEcoVadis, onFullAssessment }) {
         </div>
       </section>
 
-      {/* Step 1 — Choose a path. The hero button scrolls here. */}
+      {/* Step 1 — Choose a path. The hero button scrolls here. The page itself
+          is public; the cards are where verification starts (spec v3.1
+          Section 8): without a verified session, either one opens Verify
+          Your Email instead of its chooser. */}
       <section id="step-1" className="scroll-mt-6 bg-mint">
         <div className="mx-auto max-w-6xl px-5 py-16 sm:px-8 sm:py-20">
           <h2 className="font-heading text-2xl font-medium sm:text-3xl">Step 1 — Choose a path.</h2>
-          <div className="mt-10 grid gap-6 md:grid-cols-2">
-            <ChoiceCard
-              overline="Path A"
-              title="You hold a current EcoVadis scorecard"
-              body="If your scorecard was issued within the last 12 months, submit its details here and skip the full questionnaire. We accept the scorecard as evidence in place of the ESRS-aligned assessment."
-              action="Submit EcoVadis Scorecard"
-              onOpen={onEcoVadis}
-            />
-            <ChoiceCard
-              overline="Path B"
-              title="You do not hold a current scorecard"
-              body="Complete the ESRS-aligned assessment: seven sections covering climate, pollution, water, waste, biodiversity, and social governance. Fill it in on this page, or download the template, complete it internally, and upload it back."
-              action="Start Full Assessment"
-              onOpen={onFullAssessment}
-            />
+          <div className="mt-10">
+            <PathCards onEcoVadis={onEcoVadis} onFullAssessment={onFullAssessment} />
           </div>
         </div>
       </section>

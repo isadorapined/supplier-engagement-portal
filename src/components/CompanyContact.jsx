@@ -1,6 +1,6 @@
 import { Button } from '@/components/ui/Button'
 import { Card } from '@/components/ui/Card'
-import { Input, Label } from '@/components/ui/Field'
+import { Hint, Input, Label } from '@/components/ui/Field'
 import { ProblemList, SectionHeading } from '@/components/Chrome'
 import { IDENTITY_FIELDS } from '@/lib/questions'
 
@@ -15,6 +15,12 @@ import { IDENTITY_FIELDS } from '@/lib/questions'
 //
 // Visual treatment is v2.1 Section 10.4 exactly, via Card and Input — no new
 // pattern is introduced here (criterion 16).
+//
+// v3.1 (criterion 26): the contact email is the address the supplier just
+// verified. It arrives pre-filled from the session and cannot be edited, on
+// all four doors. The database enforces the same thing independently — the
+// submissions INSERT policy refuses a row whose contact_email is not the
+// session's own — so this lock is a courtesy, not the control.
 export default function CompanyContact({
   identity,
   onChange,
@@ -30,28 +36,39 @@ export default function CompanyContact({
 }) {
   const fields = (
     <div className="grid gap-5 sm:grid-cols-2">
-      {IDENTITY_FIELDS.map((field, index) => (
-        <div
-          key={field.key}
-          // The email field runs full width: addresses are long and wrap badly
-          // in a half-width field on a narrow screen (criterion 19).
-          className={field.type === 'email' ? 'sm:col-span-2' : undefined}
-        >
-          <Label htmlFor={`identity-${field.key}`} required>
-            {field.label}
-          </Label>
-          <Input
-            id={`identity-${field.key}`}
-            data-identity={field.key}
-            type={field.type}
-            autoComplete={field.autoComplete}
-            autoFocus={index === 0 && !embedded}
-            className="mt-2"
-            value={identity[field.key] ?? ''}
-            onChange={(event) => onChange(field.key, event.target.value)}
-          />
-        </div>
-      ))}
+      {IDENTITY_FIELDS.map((field, index) => {
+        const locked = field.key === 'contactEmail'
+        return (
+          <div
+            key={field.key}
+            // The email field runs full width: addresses are long and wrap badly
+            // in a half-width field on a narrow screen (criterion 19).
+            className={field.type === 'email' ? 'sm:col-span-2' : undefined}
+          >
+            <Label htmlFor={`identity-${field.key}`} required={!locked}>
+              {field.label}
+            </Label>
+            <Input
+              id={`identity-${field.key}`}
+              data-identity={field.key}
+              type={field.type}
+              autoComplete={locked ? 'off' : field.autoComplete}
+              autoFocus={index === 0 && !embedded}
+              className={locked ? 'mt-2 cursor-default text-ink/80' : 'mt-2'}
+              value={identity[field.key] ?? ''}
+              readOnly={locked}
+              aria-describedby={locked ? 'identity-contactEmail-hint' : undefined}
+              onChange={locked ? undefined : (event) => onChange(field.key, event.target.value)}
+            />
+            {locked ? (
+              <Hint className="mt-2" id="identity-contactEmail-hint">
+                The address you verified. To submit under a different address, start again and
+                verify that one.
+              </Hint>
+            ) : null}
+          </div>
+        )
+      })}
     </div>
   )
 

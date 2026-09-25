@@ -28,13 +28,14 @@ page.on('request', (r) => {
   const u = r.url()
   if (u.startsWith(BASE) || u.startsWith('data:') || u.startsWith('blob:') || u.includes('fonts.g')) return
   if (u.includes('/rest/v1/')) return // Supabase, asserted on its bodies below
+  if (u.includes('/auth/v1/')) return // Supabase Auth (v3.1), stubbed
   escaped.push(`${r.method()} ${u}`)
 })
 
 const sb = await mockSupabase(page)
 
 // ===== Criterion 5: Path A door one =====
-await page.goto(BASE, { waitUntil: 'networkidle' })
+await sb.verify(BASE)
 await page.getByRole('button', { name: 'Submit EcoVadis Scorecard' }).click()
 await page.getByRole('button', { name: 'Upload your scorecard' }).click()
 
@@ -49,17 +50,16 @@ check('no file picker on the identity step', await page.locator('input[type=file
 await page.getByRole('button', { name: 'Next' }).click()
 check('gate blocks with all five empty',
   await page.locator('h2').first().innerText(), 'Before you begin')
-check('all five are named as needing attention',
-  (await page.getByRole('alert').innerText()).includes('5 fields need attention'), true)
+// v3.1: the email arrives pre-filled from the verified session, so four
+// free-text fields are left for the gate to name.
+check('the four free-text fields are named as needing attention',
+  (await page.getByRole('alert').innerText()).includes('4 fields need attention'), true)
+check('contact email locked to the verified address', [
+  await page.inputValue('[data-identity="contactEmail"]'),
+  await page.locator('[data-identity="contactEmail"]').evaluate((el) => el.readOnly),
+], ['marta.vogel@northwind-components.de', true])
 
-await fillIdentity(page, { contactEmail: 'not-an-email' })
-await page.getByRole('button', { name: 'Next' }).click()
-check('gate blocks on an invalid email',
-  await page.locator('h2').first().innerText(), 'Before you begin')
-check('the email is the field named',
-  (await page.getByRole('alert').innerText()).includes('valid email address'), true)
-
-await page.fill('[data-identity="contactEmail"]', 'marta.vogel@northwind-components.de')
+await fillIdentity(page)
 await page.getByRole('button', { name: 'Next' }).click()
 check('advances to step 2',
   await page.locator('h2').first().innerText(), 'Upload your scorecard')
@@ -130,11 +130,16 @@ check('lists the headline fields and the identity from step 1', [
 check('lists the attached filename', summary.includes('scorecard.pdf'), true)
 
 // ===== Criterion 13: "Start another submission" clears the browser only =====
-const writesBefore = sb.calls.length
+const writesBefore = sb.writes()
 await page.getByRole('button', { name: 'Start another submission' }).click()
 check('restart returns to the landing page',
   await page.getByRole('heading', { name: 'Step 1 — Choose a path.' }).isVisible(), true)
-check('restart issues no database call of its own', sb.calls.length, writesBefore)
+check('restart issues no database call of its own', sb.writes(), writesBefore)
+// One verification, one submission: the path card now asks for the email again.
+await page.getByRole('button', { name: 'Submit EcoVadis Scorecard' }).click()
+check('restart requires a fresh verification',
+  await page.getByRole('heading', { name: 'Verify your email.' }).isVisible(), true)
+await sb.verify(BASE)
 await page.getByRole('button', { name: 'Submit EcoVadis Scorecard' }).click()
 await page.getByRole('button', { name: 'Upload your scorecard' }).click()
 check('restart cleared the identity step',
@@ -155,6 +160,7 @@ check('reload lands on a clean landing page',
   await page.getByRole('heading', { name: 'Step 1 — Choose a path.' }).isVisible(), true)
 check('no submission is retained after reload',
   await page.getByRole('heading', { name: 'Submission complete.' }).count(), 0)
+await sb.verify(BASE)
 await page.getByRole('button', { name: 'Submit EcoVadis Scorecard' }).click()
 await page.getByRole('button', { name: 'Upload your scorecard' }).click()
 check('no retained company name', await page.inputValue('[data-identity="company"]'), '')
