@@ -1,6 +1,6 @@
--- v3.1 access phase, part 2 of 2 — CUTOVER. Apply only once the v3.1 portal
--- (magic link) is merged and deployed: from this moment the v3.0 build, which
--- writes as anon, can no longer submit.
+-- v3.1 access phase, part 2 of 2 — CUTOVER. Applied 25 Sep 2026 12:57 UTC,
+-- right after the v3.1 portal deployed (Netlify, commit 11b0e4e). From this
+-- moment a v3.0 build, which writes as anon, can no longer submit.
 -- Per docs/access-matrix.md Section 6, lines 2, 5 and 6, and Section 7 rule 1:
 -- anon has no policy and no table grant on either table after this build.
 

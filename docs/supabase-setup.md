@@ -4,7 +4,7 @@
 > schema in CLAUDE.md from the moment it exists. Update it at every save point
 > that touches the database — a table, a column, a policy, or a function.
 
-**Last updated:** 25 September 2026 — session 5 (v3.1 access phase, part 1 applied; part 2 pending cutover)
+**Last updated:** 25 September 2026 — session 5 (v3.1 live; both access-phase migrations applied)
 
 ---
 
@@ -135,8 +135,11 @@ fix the policy or the query.
 
 | Table | Policy | Role | Command | State |
 |-------|--------|------|---------|-------|
-| `submissions` | `verified supplier may insert own submission` | `authenticated` | `INSERT` with check `contact_email = auth.email() and verified_user_id = auth.uid() and status = 'new'` | **live** (v3.1 part 1) |
-| `submissions` | `anon may insert a submission` | `anon` | `INSERT` with check `status = 'new'` | live until cutover — **dropped by v3.1 part 2** |
+| `submissions` | `verified supplier may insert own submission` | `authenticated` | `INSERT` with check `contact_email = auth.email() and verified_user_id = auth.uid() and status = 'new'` | live |
+| `submissions` | ~~`anon may insert a submission`~~ | `anon` | — | **dropped** at cutover (25 Sep, 12:57 UTC) |
+
+`anon` has no policy and no table grant on `submissions` or `companies`, and
+no execute on `resolve_company`.
 | `companies` | *(none from the portal — deliberately)* | — | — | — |
 
 The `status = 'new'` term is stricter than access-matrix.md §6 line 1 asks
@@ -214,9 +217,11 @@ reachable from the build container. The full record is in PROGRESS.md.
 | reviewer | `select` `submissions` / `companies` / status log | every row |
 | reviewer | `set_submission_status` | past the reviewer check (stopped by the row's own state rule) |
 
-Until part 2 is applied, the live `anon` behaviour is still the v3.0 behaviour.
-`anon` can insert into `submissions` and call `resolve_company()`, so the live
-v3.0 portal keeps working until the v3.1 portal is deployed.
+**Re-run against the live state after cutover** (25 Sep, rolled back). `anon`
+insert, select and `resolve_company` are all refused with permission denied. A
+plain verified supplier's `resolve_company` and own insert are allowed. Its
+mismatched-email insert is refused by RLS. Its reads return 0 rows, and its
+update and delete affect 0 rows. Every cell passes.
 
 ---
 
@@ -224,10 +229,9 @@ v3.0 portal keeps working until the v3.1 portal is deployed.
 
 ### `public.resolve_company(p_legal_name, p_registered_country, p_contact_name, p_contact_title, p_contact_email) → uuid`
 
-`SECURITY DEFINER`, `set search_path = public, pg_temp`. From v3.1, execute is
-granted to `authenticated` (part 1, live). v3.1 part 2 revokes it from `anon`
-and `public` at cutover. Until then `anon` still holds it, for the live v3.0
-portal.
+`SECURITY DEFINER`, `set search_path = public, pg_temp`. Execute is granted to
+`authenticated` only; it was revoked from `anon` and `public` at the v3.1
+cutover.
 
 Implements spec §5's matching rule server-side:
 
@@ -277,7 +281,7 @@ matching legal name. This is carried over from v3.0 and is on the Backlog
 | `dashboard_v1_*` (six, 18 Sep 2026) | **Review dashboard, not this repo.** `submission_status_changes`, `submissions.status`, the superseding trigger, `set_submission_status`, the three `authenticated` read policies, and `status = 'new'` added to the anon insert policy |
 | `v31_verified_supplier_insert_path` (25 Sep 2026) | v3.1 part 1: `submissions.verified_user_id` and `submissions.contact_email`; `authenticated` INSERT policy; execute on `resolve_company` granted to `authenticated`. File: `supabase/migrations/20260925010620_v31_verified_supplier_insert_path.sql` |
 | `v31_scope_dashboard_access_to_reviewers` (25 Sep 2026) | The dashboard's three read policies and `set_submission_status` now require `app_metadata.role = 'reviewer'`. Applied on the builder's instruction. File: `supabase/migrations/20260925013409_v31_scope_dashboard_access_to_reviewers.sql` |
-| *pending* `v31_close_anon_write_path` | v3.1 part 2, **not yet applied**: drops the anon insert policy; revokes `resolve_company` from `anon` and `public`; revokes all `anon` table grants on `submissions` and `companies`. File: `supabase/pending/v31_close_anon_write_path.sql`. Apply at cutover, right after the v3.1 portal deploys. Once applied, the live v3.0 build cannot submit. |
+| `v31_close_anon_write_path` (25 Sep 2026, 12:57 UTC) | v3.1 part 2, cutover: drops the anon insert policy, revokes `resolve_company` from `anon` and `public`, and revokes all `anon` table grants on `submissions` and `companies`. File: `supabase/migrations/20260925125723_v31_close_anon_write_path.sql` |
 
 ---
 
@@ -367,7 +371,7 @@ order by s.submitted_at desc;
   `src/lib/questions.js`; if those ids ever change, historical rows keep the old
   keys. Prefer adding ids over renaming them.
 - Linter, 25 Sep 2026: `anon_security_definer_function_executable` on
-  `resolve_company` (clears at part 2);
+  `resolve_company` (cleared by part 2);
   `authenticated_security_definer_function_executable` on `resolve_company`
   and on `set_submission_status` (both intentional; the latter checks the
   reviewer claim itself);

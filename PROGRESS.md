@@ -4,20 +4,19 @@
 > anything. Update it at every save point. Replace content — do not append.
 > History lives in git.
 
-**Session:** 5 — v3.1 magic link built; dashboard scoped to reviewers; Auth URLs set
+**Session:** 5 — v3.1 live: magic link in front of the doors, anon write path closed
 **Last updated:** 25 September 2026
 **Live URL:** https://the-corporate-sep.netlify.app (Netlify project `the-corporate-sep`, deploys from `main`)
-**Stage:** login and access rules together. Built and gate half A run on 25 September 2026. Half A passes after the dashboard was scoped to reviewers. Half B and cutover not done. This stage isn't absorbed into Current state until both gate halves pass.
+**Stage:** login and access rules together. v3.1 deployed on 25 September 2026 (PR #6, Netlify 12:55 UTC), with the cutover migration applied at 12:57 UTC. Gate half A passes against the live state. **Half B (Isadora) is outstanding.** This stage isn't absorbed into Current state until it passes.
 **Supabase project:** created — ref `smnrfopzzzhazkehcqqn`, URL `https://smnrfopzzzhazkehcqqn.supabase.co`
 
 ## Current state
-**Live today:** v3.0 on `main`. Every completed submission is written to
-Supabase and linked to a reusable company record, with no login in front of
-it. Unchanged by this session, because the v3.1 work sits on a branch until
-it is merged.
+**Live today (25 Sep, 12:55 UTC): v3.1.** A supplier verifies their email by
+magic link before any door opens. Every completed submission is written to
+Supabase, tied to the verified identity, and linked to a reusable company
+record. anon can no longer write anything.
 
-**Built this session, on branch `claude/trusting-johnson-v9p8cq`:** v3.1
-email verification.
+What v3.1 added:
 - The Landing page stays public (builder's choice, 25 Sep). Either path card
   opens **Verify Your Email** when there is no verified session, then
   **Check Your Inbox** (with resend and "use a different email"). The link
@@ -30,12 +29,15 @@ email verification.
 - All five suites pass: parser, ui, ui2, ui3, and the new ui4 (verification
   flow, criteria 21–26).
 
-**Database:** v3.1 part 1 is **live** in "The Corporate" (`smnrfopzzzhazkehcqqn`).
-It is additive only: `submissions.verified_user_id`, `submissions.contact_email`
-(both database-stamped from the session), the `authenticated` INSERT policy,
-and `resolve_company` execute for `authenticated`. Part 2 (close anon's write
-path) is **written but not applied**, because applying it before the v3.1
-portal deploys would stop the live v3.0 portal from submitting.
+**Database:** all three v3.1 migrations are applied in "The Corporate"
+(`smnrfopzzzhazkehcqqn`):
+- `v31_verified_supplier_insert_path`: `verified_user_id` and `contact_email`,
+  both database-stamped from the session, plus the `authenticated` INSERT
+  policy.
+- `v31_scope_dashboard_access_to_reviewers`: the dashboard reads only for
+  `app_metadata.role = 'reviewer'`.
+- `v31_close_anon_write_path`: anon has no policy, no table grant and no
+  function grant.
 
 **The same Supabase project also holds the separate review dashboard**
 (migrations `dashboard_v1_*`, 18 Sep): `submissions.status`,
@@ -75,10 +77,9 @@ was left untouched, and this is now the blocker on turning sign-up on.
       only reviewer (session 5, builder's decision)
 - [x] Supabase Auth URL Configuration: Site URL and both Redirect URLs set
       (builder, confirmed by screenshot, 25 Sep)
-- [ ] Builder: log out of the dashboard and back in, so the reviewer claim
-      reaches the token (the dashboard looks empty until then)
-- [ ] Builder: "Allow new users to sign up" ON (now safe), optional Magic
-      Link template rewording
+- [x] Builder: logged out of the dashboard and back in; sign-up turned ON
+      (25 Sep). The Magic Link template stays at Supabase's default: editing it
+      isn't available to this project without custom SMTP.
 - [ ] Builder decision: custom SMTP (Resend) before real suppliers. The
       built-in mailer reaches only Supabase team members
 - [x] (v3.1 revision) Build the three new screens: Verify Your Email, Check
@@ -91,17 +92,14 @@ was left untouched, and this is now the blocker on turning sign-up on.
       applied: `verified_user_id` + `contact_email` columns, `authenticated`
       INSERT policy, `resolve_company` granted to `authenticated`;
       docs/supabase-setup.md updated (session 5)
-- [ ] (v3.1 revision) Access phase part 2 — CUTOVER: apply
-      `supabase/pending/v31_close_anon_write_path.sql` via `apply_migration`
-      (name `v31_close_anon_write_path`) immediately after the v3.1 portal is
-      live on Netlify, move the file into `supabase/migrations/` with its
-      version, re-run gate half A against the live state, update
-      docs/supabase-setup.md
+- [x] (v3.1 revision) Access phase part 2 — CUTOVER: `v31_close_anon_write_path`
+      applied at 12:57 UTC, two minutes after the deploy; half A re-run against
+      the live state, and every cell passes (session 5)
 - [ ] (v3.1 revision) Tighten `verified_user_id` / `contact_email` to
       `not null` once the three pre-verification rows are deleted (they block
       it; see supabase-setup.md)
-- [x] (v3.1 revision) GATE, half A (Claude Code) — passes after the reviewer
-      scoping (25 Sep, below). Re-run once more after part 2 is live.
+- [x] (v3.1 revision) GATE, half A (Claude Code) — passes against the live
+      post-cutover state (25 Sep, below)
 - [ ] (v3.1 revision) GATE, half B (Isadora, isadorapined@gmail.com) — verify
       her own email end to end, land on Path Selection (not Landing), complete
       one door, confirm the row in the Supabase table editor carries her
@@ -115,7 +113,8 @@ was left untouched, and this is now the blocker on turning sign-up on.
       Supabase), a real resend
 - [ ] (v3.1 revision) Acceptance criteria pass — verify criteria 21–28
       (existing criteria 1–20 already covered)
-- [ ] (v3.1 revision) Push to main → Netlify auto-deploys
+- [x] (v3.1 revision) Merged to main (PR #6) → Netlify deployed 11b0e4e,
+      25 Sep 12:55 UTC
 
 ## Refusal test record
 Kept, never cleared. Any future change to a rule re-runs both halves before the
@@ -155,6 +154,16 @@ companies and 0 status-log rows, and `set_submission_status` is refused with
 "Only reviewers can change a submission's status." Its own insert is still
 allowed. A reviewer (isadorapined@gmail.com, flagged) reads every row and gets
 past the reviewer check. **Lines 3 and 4 now pass: every cell passes.**
+
+**25 September 2026 — half A, live post-cutover — Claude Code** (rolled back).
+- anon insert into `submissions`: refused, `permission denied for table submissions`.
+- anon select on `submissions` / `companies`: refused, permission denied.
+- anon `resolve_company`: refused, `permission denied for function resolve_company`.
+- Plain verified supplier (piff@gmail.com's id): `resolve_company` allowed;
+  mismatched-email insert refused by RLS; own insert allowed; reads 0
+  submissions and 0 companies; update 0 rows; delete 0 rows.
+
+Every cell passes.
 
 **Half B (Isadora):** not yet run. It needs the Auth settings, a resolution of
 the blocker, and the deploy.
@@ -353,10 +362,11 @@ the blocker, and the deploy.
   not applicable for this class/portfolio project; revisit if that changes.
 
 ## Notes for next session
-- The v3.1 build is on branch `claude/trusting-johnson-v9p8cq`, not on `main`.
-  Do not merge it while the dashboard blocker (Known issues) is open and
-  sign-up is on.
-- Order at cutover: builder sets the Auth URLs (done) → reviewer fix (done) →
-  sign-up ON → merge → Netlify deploys → apply part 2 (`supabase/pending/`) at
-  once → re-run half A → Isadora runs half B. Real suppliers additionally need
-  custom SMTP.
+- Gate half B is the one step left in this stage. Isadora verifies
+  isadorapined@gmail.com on the live site, completes one door, and checks that
+  the row in the table editor carries her `contact_email` and a
+  `verified_user_id` matching her `auth.users` id. Record the result under
+  Refusal test record.
+- Real suppliers still can't receive the link: the built-in mailer reaches
+  only Supabase team members. Custom SMTP (Resend) is the decision to take
+  next.
