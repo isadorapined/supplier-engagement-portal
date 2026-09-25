@@ -4,7 +4,11 @@ Five suites covering the acceptance criteria in spec Section 13 that can be
 checked before deployment. They are deliberately dependency-light: plain Node
 scripts, no test framework.
 
-The three browser suites stub the two Supabase calls a submit makes
+The browser suites stub the two Supabase calls a submit makes, plus Supabase
+Auth (v3.1: the magic-link request, the token check, and sign-out). A suite
+reaches a door the way a clicked link does: `sb.verify(BASE)` loads the portal
+with a session in the URL fragment. The rest of this paragraph predates v3.1.
+They stub the two Supabase calls a submit makes
 (`tests/support/supabase-mock.mjs`), so they run offline and deterministically.
 That stub is also how acceptance criterion 11 is checked now: the page
 legitimately talks to the network from v3.0 on, so the suites no longer assert
@@ -21,13 +25,15 @@ suites:
 
 ```
 npm install --no-save playwright vite-node
-npm run build
+# Placeholder values give the stubs a Supabase host to intercept.
+VITE_SUPABASE_URL=https://mock-project.supabase.co VITE_SUPABASE_ANON_KEY=mock-anon-key npm run build
 npx vite preview --port 4173 --strictPort &
 
 npx vite-node tests/parser.test.mjs tests/fixtures   # upload validation, rules, identity gate
 node tests/ui.test.mjs  tests/fixtures               # landing page, brand, Path A door two
 node tests/ui2.test.mjs tests/fixtures               # Path B, both doors, responsive
 node tests/ui3.test.mjs tests/fixtures               # Path A door one, restart, submit failure
+node tests/ui4.test.mjs                              # v3.1 magic link: criteria 21–26
 
 # Against the real database (criteria 4, 5, 6, 7, 11, 13):
 VITE_SUPABASE_URL=... SUPABASE_SERVICE_ROLE_KEY=... \

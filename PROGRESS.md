@@ -4,48 +4,55 @@
 > anything. Update it at every save point. Replace content — do not append.
 > History lives in git.
 
-**Session:** 4 — portal live and persisting; two deployment faults found and fixed
-**Last updated:** 11 September 2026
+**Session:** 5 — v3.1 magic link built; open sign-up blocked by the dashboard's read policies
+**Last updated:** 25 September 2026
 **Live URL:** https://the-corporate-sep.netlify.app (Netlify project `the-corporate-sep`, deploys from `main`)
-**Stage:** login and access rules together — access-matrix.md and user-stories.md (full run) are in, and CLAUDE.md was regenerated for v3.1 on 24 September 2026; this stage isn't absorbed into Current state until the access phase below is built and both gate halves pass.
+**Stage:** login and access rules together. Built and gate half A run on 25 September 2026. Half A fails two read cells because of the review dashboard's policies (see Known issues). Half B and cutover not done. This stage isn't absorbed into Current state until both gate halves pass.
 **Supabase project:** created — ref `smnrfopzzzhazkehcqqn`, URL `https://smnrfopzzzhazkehcqqn.supabase.co`
 
 ## Current state
-v3.0 is built and passing the full local test pass — 49 parser checks and three
-browser suites, all green. The tool is Tier 2 as deployed today: every completed
-submission is written to Supabase and linked to a reusable company record, with no
-login in front of it yet.
+**Live today:** v3.0 on `main`. Every completed submission is written to
+Supabase and linked to a reusable company record, with no login in front of
+it. Unchanged by this session, because the v3.1 work sits on a branch until
+it is merged.
 
-Database is live in the **existing** Supabase project "The Corporate"
-(`smnrfopzzzhazkehcqqn`, us-east-1, Free). `companies` and `submissions` are
-built with RLS on both. `companies` carries **no anon policy at all** — supplier
-contact details cannot be read from the browser — and all access to it goes
-through `resolve_company()`, a `SECURITY DEFINER` function that does the
-match-or-insert server-side and returns only a company id. `submissions` is
-insert-only, currently open to `anon` with `check (true)` — this is exactly what
-the v3.1 access phase below closes. docs/supabase-setup.md is the schema source
-of truth (as of 11 September 2026 — still to be updated once the v3.1 access
-phase touches the database).
+**Built this session, on branch `claude/trusting-johnson-v9p8cq`:** v3.1
+email verification.
+- The Landing page stays public (builder's choice, 25 Sep). Either path card
+  opens **Verify Your Email** when there is no verified session, then
+  **Check Your Inbox** (with resend and "use a different email"). The link
+  returns straight to a new **Path Selection** screen, not Landing. An expired
+  or used link shows **Link No Longer Valid**.
+- `contact_email` on the Company & Contact step is pre-filled from the session
+  and read-only on all four doors.
+- The session is in-memory only, with nothing in localStorage. It ends when a
+  submission saves, so "Start another submission" verifies afresh.
+- All five suites pass: parser, ui, ui2, ui3, and the new ui4 (verification
+  flow, criteria 21–26).
 
-All four doors open with the same five-field Company & Contact step, rendered
-from one `CompanyContact` component and gated by one `identityProblems()` — so
-criteria 2 and 3 hold by construction rather than by repetition. "S1" is gone as
-a numbered section: the guided form is eight steps (Company & Contact, S2–S7,
-Declaration), the parser reads 28 rows instead of 30, and both Path B
-denominators are 28. View 3a's step 2 is exactly three fields plus the file
-picker; View 3b's is exactly Q1–Q9.
+**Database:** v3.1 part 1 is **live** in "The Corporate" (`smnrfopzzzhazkehcqqn`).
+It is additive only: `submissions.verified_user_id`, `submissions.contact_email`
+(both database-stamped from the session), the `authenticated` INSERT policy,
+and `resolve_company` execute for `authenticated`. Part 2 (close anon's write
+path) is **written but not applied**, because applying it before the v3.1
+portal deploys would stop the live v3.0 portal from submitting.
 
-The transparency notice reads "Your information is stored for The Corporate's
-review." Files are still never stored — only filename and size reach the database.
+**The same Supabase project also holds the separate review dashboard**
+(migrations `dashboard_v1_*`, 18 Sep): `submissions.status`,
+`submission_status_changes`, a superseding trigger, `set_submission_status`,
+and `authenticated` read-all policies on `companies`, `submissions` and the
+status log. None of it was in docs/supabase-setup.md until this session. It is
+documented there now, and was not modified, on the builder's instruction.
+docs/supabase-setup.md is the schema source of truth, updated 25 September 2026.
 
 ## Last session
-Builder reported completing a submission on the live site with nothing arriving
-in the database. Traced it to v3.0 sitting unmerged in open PR #2 while `main`
-was still v2.1. Merged, redeployed with both Netlify environment variables set,
-found and fixed a second fault (a non-ISO-8859-1 character in the copied anon
-key value broke `Headers.set()` before any request left the browser), and
-confirmed a live submission at 14:53 UTC wrote both rows correctly. Criterion
-20's persistence half is met.
+Moved the uploaded v3.1 docs into `docs/` (merged as PR #5). Built v3.1: the
+three pre-auth screens, Path Selection, the locked contact email, and the
+session lifecycle. Applied v3.1 migration part 1 and ran gate half A with
+part 2 inside a rolled-back transaction. Every portal rule held. Found that
+the review dashboard's `authenticated` read policies let any verified supplier
+read every company and submission. Per the builder's instruction the dashboard
+was left untouched, and this is now the blocker on turning sign-up on.
 
 ## Remaining work
 - [x] Netlify environment variables set and inlined by a fresh build; live
@@ -63,45 +70,123 @@ confirmed a live submission at 14:53 UTC wrote both rows correctly. Criterion
 - [ ] Builder reviews the light nav bar sitting above the dark hero band
 - [ ] Confirm whether the supplier-facing wordmark should stay "Data Leaf" or
       become The Corporate's — the footer already reads "© 2026 The Corporate"
-- [ ] (v3.1 revision) Configure Supabase Auth for magic link: "Enable sign-ups"
-      ON, email OTP/magic link flow enabled, no password flow. Sender is
-      Supabase's built-in auth mailer (accepted for testing-scale traffic —
-      see Known Issues).
-- [ ] (v3.1 revision) Build the three new screens: Verify Your Email, Check
-      Your Inbox (with the resend action), Link No Longer Valid
-- [ ] (v3.1 revision) Update the `CompanyContact` component so `contact_email`
-      is sourced from the verified session (`auth.email()`) and read-only on
-      all four doors; every other field stays free text
-- [ ] (v3.1 revision) Access phase — login and rules together, one build,
-      per docs/access-matrix.md: add `submissions.verified_user_id uuid not
-      null default auth.uid() references auth.users(id)` (named migration);
-      change the `submissions` INSERT policy from `anon`/`check (true)` to
-      `authenticated` with `WITH CHECK (contact_email = auth.email() AND
-      verified_user_id = auth.uid())`; move `resolve_company()`'s execute
-      grant from `anon` to `authenticated`; update docs/supabase-setup.md in
-      the same save point
-- [ ] (v3.1 revision) GATE, half A (Claude Code) — through the API directly:
-      attempt a `submissions` insert as `anon` (must refuse), an authenticated
-      insert with a mismatched `contact_email` (must refuse), a `companies`
-      call as any role (must refuse), and `resolve_company()` as `anon` (must
-      refuse); paste every result into Refusal test record below
+- [ ] **BLOCKER (builder decision):** the review dashboard's three
+      `authenticated` read-all policies and `set_submission_status` apply to
+      every verified supplier. Until they are limited to dashboard reviewers
+      (or the portal moves to its own Supabase project), turning sign-up on
+      lets any supplier read every other supplier's data and change statuses.
+      See Known issues.
+- [ ] (v3.1 revision) Configure Supabase Auth, builder in the dashboard
+      (no MCP route for auth settings). Email provider on. Site URL
+      `https://the-corporate-sep.netlify.app`. Redirect URLs
+      `https://the-corporate-sep.netlify.app/**` and `http://localhost:5173/**`.
+      "Allow new users to sign up" ON **only after the blocker above is
+      resolved**. Sender: Supabase's built-in mailer (accepted, Known issues).
+- [x] (v3.1 revision) Build the three new screens: Verify Your Email, Check
+      Your Inbox (with the resend action), Link No Longer Valid; plus Path
+      Selection (session 5)
+- [x] (v3.1 revision) Update the `CompanyContact` component so `contact_email`
+      is sourced from the verified session and read-only on all four doors;
+      every other field stays free text (session 5)
+- [x] (v3.1 revision) Access phase part 1 — `v31_verified_supplier_insert_path`
+      applied: `verified_user_id` + `contact_email` columns, `authenticated`
+      INSERT policy, `resolve_company` granted to `authenticated`;
+      docs/supabase-setup.md updated (session 5)
+- [ ] (v3.1 revision) Access phase part 2 — CUTOVER: apply
+      `supabase/pending/v31_close_anon_write_path.sql` via `apply_migration`
+      (name `v31_close_anon_write_path`) immediately after the v3.1 portal is
+      live on Netlify, move the file into `supabase/migrations/` with its
+      version, re-run gate half A against the live state, update
+      docs/supabase-setup.md
+- [ ] (v3.1 revision) Tighten `verified_user_id` / `contact_email` to
+      `not null` once the three pre-verification rows are deleted (they block
+      it; see supabase-setup.md)
+- [~] (v3.1 revision) GATE, half A (Claude Code) — run 25 Sep (below). Every
+      portal rule refuses. **Two cells fail:** `submissions · read` and
+      `companies · read` for Verified Supplier, both because of the dashboard's
+      policies. Re-run after the blocker is resolved and after part 2 is live.
 - [ ] (v3.1 revision) GATE, half B (Isadora, isadorapined@gmail.com) — verify
       her own email end to end, land on Path Selection (not Landing), complete
       one door, confirm the row in the Supabase table editor carries her
       `contact_email` and a `verified_user_id` matching her `auth.users` row.
       Both halves must pass before this stage deploys.
-- [ ] (v3.1 revision) Local test pass — full walkthrough including the new
-      verification flow, an expired/reused link, and the resend action
+- [x] (v3.1 revision) Local test pass — ui4 covers the verification flow, an
+      expired/reused link, resend, rate limit, and the locked email on all four
+      doors; ui/ui2/ui3 updated and green (session 5, Supabase Auth stubbed)
+- [ ] (v3.1 revision) Real-email walkthrough once the Auth settings above are
+      in place — a real link, a real second click (criterion 24 against real
+      Supabase), a real resend
 - [ ] (v3.1 revision) Acceptance criteria pass — verify criteria 21–28
       (existing criteria 1–20 already covered)
 - [ ] (v3.1 revision) Push to main → Netlify auto-deploys
 
 ## Refusal test record
-None yet. Filled by Claude Code at half A and by Isadora at half B (date, who,
-cell tried, result). Kept, never cleared. Any future change to a rule re-runs
-both halves before the next push.
+Kept, never cleared. Any future change to a rule re-runs both halves before the
+next push.
+
+**25 September 2026 — half A — Claude Code.** Run as SQL against the live
+database with `set local role` and `request.jwt.claims` (Isadora's `auth.users`
+id and email for `authenticated`). Part 2 was applied inside the same
+transaction, and everything was rolled back afterwards; row counts were
+confirmed unchanged. The Supabase REST API was not reachable from the build
+container.
+
+| Line | Cell | Attempt | Result | Verdict |
+|---|---|---|---|---|
+| 2 | submissions · create · anon | insert | `permission denied for table submissions` | pass |
+| 6 | submissions · read/delete · anon | select, delete | permission denied | pass |
+| 6 | companies · any · anon | select, insert, update | permission denied | pass |
+| 5 | resolve_company · execute · anon | call | `permission denied for function resolve_company` | pass |
+| 5 | resolve_company · execute · Verified Supplier | call | allowed | pass |
+| 1 | submissions · create · Verified Supplier | other `contact_email` | `new row violates row-level security policy` | pass |
+| 1 | submissions · create · Verified Supplier | other `verified_user_id` | RLS refusal | pass |
+| 1 | submissions · create · Verified Supplier | `status = 'accepted'` | RLS refusal | pass |
+| 1 | submissions · create · Verified Supplier | own identity (defaults) | allowed | pass |
+| 3 | submissions · update/delete · Verified Supplier | update, delete | 0 rows affected | pass |
+| 4 | companies · create/update/delete · Verified Supplier | insert / update / delete | RLS refusal / 0 / 0 | pass |
+| 3 | submissions · read · Verified Supplier | select | **every row returned** | **FAIL — dashboard policy** |
+| 4 | companies · read · Verified Supplier | select | **every row returned** | **FAIL — dashboard policy** |
+
+Not in the matrix but found alongside: `set_submission_status` is executable by
+any `authenticated` session, which means any verified supplier once sign-up is
+on.
+
+**Half B (Isadora):** not yet run. It needs the Auth settings, a resolution of
+the blocker, and the deploy.
 
 ## Build decisions
+- (v3.1) Landing stays public; the path cards are the gate. Builder's choice
+  (25 Sep) between that and gating the whole site. A valid link lands on a
+  standalone Path Selection screen (the same two cards, one shared
+  `PathCards` component), which satisfies criterion 23's "not the Landing
+  page".
+- (v3.1) Implicit flow, `persistSession: false`, `autoRefreshToken: true`.
+  The session comes back in the URL fragment, so nothing has to be stored
+  before the email is sent, and nothing is stored after. The token refreshes
+  in memory, so an assessment longer than an hour still submits. A reload
+  drops the session. That is intended: no persistent sessions.
+- (v3.1) The session ends (`signOut({ scope: 'local' })`) as soon as a
+  submission saves: one verification, one submission. A failed save keeps the
+  session so the retry works.
+- (v3.1) `verified_user_id` and `contact_email` are never sent by the client.
+  Column defaults `auth.uid()` / `auth.email()` stamp them, and the INSERT
+  policy checks them. The mechanism the spec left open (v3.1 §5 point 2) is
+  therefore defaults plus `WITH CHECK`, not a trigger or a new SECURITY DEFINER
+  function, which keeps `resolve_company` the portal's only one.
+- (v3.1) Added `submissions.contact_email`. The matrix's policy and criterion
+  28 check it, but before v3.1 it existed only on `companies`.
+- (v3.1) Both new columns are nullable. Three pre-verification rows exist, and
+  a `NOT VALID` check would break the dashboard's updates to them. The INSERT
+  policy makes them non-null for every app insert. Tighten once those rows go.
+- (v3.1) The INSERT policy also requires `status = 'new'`. This is stricter
+  than the matrix, and matches the condition the dashboard put on the anon
+  policy.
+- (v3.1) The migration is split in two so the live v3.0 portal is never
+  broken. Part 1 (additive) is live. Part 2 (close anon) is applied at
+  cutover. `supabase/pending/` holds migrations not yet applied.
+- (v3.1) Check Your Inbox's resend reuses the same `signInWithOtp` call.
+  Supabase rate-limits repeat requests for the same address (about 60 s). That
+  limit shows as a plain "wait a minute" notice, not a raw error.
 - Reused the existing Supabase project "The Corporate" rather than creating
   `the-corporate-supplier-portal`. It was already there and empty, and its name
   fits spec §4's own rationale — named for the client context so it can hold
@@ -161,6 +246,24 @@ both halves before the next push.
   that created it.
 
 ## Known issues
+- **BLOCKER — the review dashboard's read policies apply to suppliers.**
+  `authenticated may read companies`, `authenticated may read submissions`,
+  `authenticated may read the status log`, and execute on
+  `set_submission_status` are all granted to every `authenticated` session. v3.1
+  makes every verified supplier `authenticated`, and sign-up is open by design.
+  So a supplier who verifies any email can read every company's contact
+  details, every submission and the status history, and can set statuses. The
+  rules this build owns all hold; this comes from the dashboard's rules
+  alone. Left as-is on the builder's instruction (the dashboard is a separate
+  tool). Fix options, for the builder: (a) scope the dashboard's policies and
+  function to reviewers only, e.g. an `app_metadata.role = 'reviewer'` claim
+  set by hand in Supabase for each dashboard login; or (b) give the portal its
+  own Supabase project. Either way, **do not turn on "Allow new users to sign
+  up" before this is fixed.** With sign-up off, the portal's magic link works
+  only for addresses already in `auth.users`.
+- Supabase's default "Magic Link" email template says "Follow this link to
+  login". It can be reworded in the Supabase dashboard (Authentication →
+  Emails) to match the portal's voice. It is shared with the dashboard.
 - **A corrupted API key value fails with no server-side trace whatsoever.**
   If `VITE_SUPABASE_ANON_KEY` contains any character outside ISO-8859-1 — an
   ellipsis, a smart quote, an en dash — supabase-js throws before the request
@@ -171,6 +274,10 @@ both halves before the next push.
   without cache". Leave "Contains secret values" unticked on both.
 - **Work reaches `main` only by merging a PR, not by pushing.** Treat a save
   point as incomplete until the PR is merged and Netlify has deployed.
+- Browser suites need a build with placeholder Supabase variables
+  (`VITE_SUPABASE_URL=https://mock-project.supabase.co
+  VITE_SUPABASE_ANON_KEY=mock-anon-key npm run build`) so the stubs have a
+  host to intercept. See tests/README.md.
 - Free plan pauses after roughly a week without traffic, and a paused project
   refuses writes. Most likely real cause of a failed submission.
 - No Data Leaf logo file. The wordmark renders as DM Sans Medium type in Deep
@@ -195,10 +302,11 @@ both halves before the next push.
 - The v1.0 template row 18 carries an internal note in its NOTES / EVIDENCE cell
   ("AUTO-FLAG: Yes triggers PFAS Risk review"). It parses as that question's
   notes and shows in the review table.
-- Supabase's linter reports two findings — `rls_enabled_no_policy` on
-  `companies` (INFO) and `anon_security_definer_function_executable` on
-  `resolve_company` (WARN, and will read differently once execute moves to
-  `authenticated` in the v3.1 build — re-check the linter after that change).
+- Supabase's linter (25 Sep): `anon_security_definer_function_executable` on
+  `resolve_company` (clears at part 2),
+  `authenticated_security_definer_function_executable` on `resolve_company`
+  (intentional) and `set_submission_status` (the blocker above), and
+  `auth_leaked_password_protection` (the dashboard's password login).
 - Playwright 1.63 expects a Chromium build newer than the one installed in the
   build environment; needs `CHROME_PATH=/opt/pw-browsers/chromium-1194/chrome-linux/chrome`.
 - Spec revised to v3.1 on 24 September 2026 — CLAUDE.md regenerated by Project
@@ -231,4 +339,9 @@ both halves before the next push.
   not applicable for this class/portfolio project; revisit if that changes.
 
 ## Notes for next session
-None.
+- The v3.1 build is on branch `claude/trusting-johnson-v9p8cq`, not on `main`.
+  Do not merge it while the dashboard blocker (Known issues) is open and
+  sign-up is on.
+- Order at cutover: builder sets the Auth URLs → blocker resolved → sign-up
+  ON → merge → Netlify deploys → apply part 2 (`supabase/pending/`) at once →
+  re-run half A → Isadora runs half B.

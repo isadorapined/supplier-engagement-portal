@@ -23,6 +23,7 @@ page.on('request', (r) => {
   if (u.startsWith(BASE) || u.startsWith('data:') || u.startsWith('blob:')) return
   if (u.includes('fonts.g')) return
   if (u.includes('/rest/v1/')) return // Supabase, asserted separately
+  if (u.includes('/auth/v1/')) return // Supabase Auth (v3.1), stubbed
   escaped.push(`${r.method()} ${u}`)
 })
 const errors = []
@@ -34,7 +35,7 @@ page.on('pageerror', (e) => errors.push(String(e)))
 const sb = await mockSupabase(page)
 
 const openPathB = async () => {
-  await page.goto(BASE, { waitUntil: 'networkidle' })
+  await sb.verify(BASE)
   await page.getByRole('button', { name: 'Start Full Assessment' }).click()
 }
 
@@ -62,11 +63,12 @@ check('progress indicator reads step 1 of 8',
 await page.getByRole('button', { name: 'Next' }).click()
 check('cannot advance with all five empty',
   await page.locator('h2').first().innerText(), 'Before you begin')
-await fillIdentity(page, { contactEmail: 'not-an-email' })
-await page.getByRole('button', { name: 'Next' }).click()
-check('cannot advance with an invalid email',
-  await page.locator('h2').first().innerText(), 'Before you begin')
-await page.fill('[data-identity="contactEmail"]', 'marta.vogel@northwind-components.de')
+// v3.1 criterion 26 — the email is the verified address and cannot be edited.
+check('contact email pre-filled from the verified session',
+  await page.inputValue('[data-identity="contactEmail"]'), 'marta.vogel@northwind-components.de')
+check('contact email is read-only',
+  await page.locator('[data-identity="contactEmail"]').evaluate((el) => el.readOnly), true)
+await fillIdentity(page)
 await page.getByRole('button', { name: 'Next' }).click()
 check('advances once all five are valid',
   (await page.locator('h2').first().innerText()).startsWith('S2'), true)
@@ -176,6 +178,7 @@ check('declaration date shown', /Declaration date\s*\n?\s*\d{1,2} \w+ \d{4}/.tes
 
 // ============ Criteria 10-13: download and upload door ============
 await page.getByRole('button', { name: 'Start another submission' }).click()
+await sb.verify(BASE)
 await page.getByRole('button', { name: 'Start Full Assessment' }).click()
 await page.getByRole('button', { name: 'Download and upload' }).click()
 
@@ -314,6 +317,8 @@ check('stats collapse to two columns',
 const btn = await page.getByRole('button', { name: 'Go to step 1' }).boundingBox()
 check('primary button is full width and tappable', btn.width > 300 && btn.height >= 44, true)
 
+await sb.verify(BASE)
+await noSideScroll('Path Selection')
 await page.getByRole('button', { name: 'Start Full Assessment' }).click()
 await page.getByRole('button', { name: 'Download and upload' }).click()
 // Criterion 19 — the new step must be usable on a narrow screen too.
@@ -336,7 +341,7 @@ const tableScrolls = await page.evaluate(() => {
 })
 check('the table scrolls inside its own container', tableScrolls, true)
 
-await page.goto(BASE, { waitUntil: 'networkidle' })
+await sb.verify(BASE)
 await page.getByRole('button', { name: 'Start Full Assessment' }).click()
 await page.getByRole('button', { name: 'Fill it in here' }).click()
 await noSideScroll('guided form')
