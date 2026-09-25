@@ -261,6 +261,17 @@ the blocker, and the deploy.
   own Supabase project. Either way, **do not turn on "Allow new users to sign
   up" before this is fixed.** With sign-up off, the portal's magic link works
   only for addresses already in `auth.users`.
+- **Supabase's built-in mailer only delivers to members of the Supabase
+  organisation's team** (Supabase docs, "Send messages only to pre-authorized
+  addresses"), and only a few emails per hour project-wide. Isadora's own
+  address works for testing. A real supplier's address gets no email at all
+  until a custom SMTP sender (the Resend upgrade path) is configured. So the
+  Resend "handover item" is a prerequisite for real suppliers, not an
+  optional upgrade. Builder decision pending.
+- Builder chose (25 Sep) fix (a) for the dashboard blocker: scope the
+  dashboard's read policies and `set_submission_status` to accounts flagged
+  `app_metadata.role = 'reviewer'`. Waiting on which accounts are reviewers
+  before applying.
 - Supabase's default "Magic Link" email template says "Follow this link to
   login". It can be reworded in the Supabase dashboard (Authentication →
   Emails) to match the portal's voice. It is shared with the dashboard.
